@@ -1,0 +1,2464 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>にじみ帖</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#efeae1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#211f1b" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="にじみ帖">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Klee+One:wght@600&display=swap">
+<style>
+/* Layout: one-screen studio — paper on a warm desk, tool rail on the left (bottom on phones), floating panels over the stage.
+   Look: natural sketchbook — linen-coloured chrome with a faint paper grain, moss-green accent, hand-lettered headings. */
+:root{
+  --chrome:#efeae1; --panel:#fbf8f2; --line:#ddd5c8; --ink:#2e2a25; --muted:#766d62;
+  --accent:#4f6f52; --accent-ink:#ffffff; --active:#e3eadb; --stage:#d2cbbf; --warn:#a2452f; --wet:#3c6fa6;
+  --font-ui:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --font-hand:"Klee One","Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic UI",sans-serif;
+  --font-display:var(--font-hand);
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .25 0 0 0 0 .2 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --chrome:#211f1b; --panel:#2a2722; --line:#3e3931; --ink:#ece6dc; --muted:#a69d90;
+  --accent:#a3c29a; --accent-ink:#17200f; --active:#36402f; --stage:#141310; --warn:#e3967f; --wet:#86b6e8; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --chrome:#211f1b; --panel:#2a2722; --line:#3e3931; --ink:#ece6dc; --muted:#a69d90;
+  --accent:#a3c29a; --accent-ink:#17200f; --active:#36402f; --stage:#141310; --warn:#e3967f; --wet:#86b6e8; color-scheme:dark }
+
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+body{background:var(--chrome);color:var(--ink);font-family:var(--font-ui);font-size:13px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button,input,select{font:inherit;color:inherit}
+#app{height:100%;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto 1fr}
+
+/* top bar */
+#top{background-image:var(--grain);grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:6px max(10px,env(safe-area-inset-right,0px)) 6px max(10px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line);background:var(--chrome);overflow-x:auto;scrollbar-width:none;white-space:nowrap}
+#top::-webkit-scrollbar{display:none}
+.brand{display:flex;align-items:baseline;gap:8px;margin-right:10px}
+.brand .mark{font-family:var(--font-hand);font-weight:600;font-size:24px;line-height:1;color:var(--accent)}
+.brand .name{font-family:var(--font-hand);font-weight:600;font-size:17px;letter-spacing:.06em}
+.spacer{flex:1}
+.viewgrp{display:inline-flex;gap:4px;align-items:center;flex:none}
+#handBtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#view.hand{cursor:grab}
+#view.hand.grabbing{cursor:grabbing}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;min-width:34px;padding:0 11px;border:1px solid var(--line);border-radius:11px;background:var(--panel);cursor:pointer;flex:none;box-shadow:0 1px 0 rgba(60,45,25,.06)}
+.btn:hover{border-color:var(--muted)}
+.btn:focus-visible,.tool:focus-visible,.sw:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn.icon{padding:0}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn[aria-pressed="true"]{background:var(--active);border-color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn svg{width:18px;height:18px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:12px;font-size:12px;color:var(--muted);border:1px solid var(--line);flex:none}
+.chip .bar{width:38px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.chip .bar i{display:block;height:100%;background:var(--wet);width:0}
+.chip.wet{color:var(--wet);border-color:var(--wet)}
+.btn.wet{color:var(--wet);border-color:var(--wet)}
+/* dry button doubles as a water gauge: the water level is how wet the paper still is */
+.meter{position:relative;overflow:hidden;isolation:isolate;min-width:118px;justify-content:flex-start;padding-left:10px}
+.meter .fill{position:absolute;left:0;right:0;bottom:0;height:0;z-index:-1;background:color-mix(in srgb,var(--wet) 34%,transparent);transition:height .5s ease,background-color .5s ease}
+.meter .wave{position:absolute;left:0;top:-5px;width:200%;height:6px;fill:color-mix(in srgb,var(--wet) 34%,transparent);transition:fill .5s ease;animation:wave 2.6s linear infinite}
+.meter.damp .fill{background:color-mix(in srgb,var(--wet) 16%,transparent)}
+.meter.damp .wave{fill:color-mix(in srgb,var(--wet) 16%,transparent);animation-duration:6s}
+.meter .ticks{position:absolute;right:5px;top:6px;bottom:6px;width:4px;z-index:-1;background:repeating-linear-gradient(to top,var(--line) 0 1px,transparent 1px 25%);opacity:.9}
+.meter .mtext{display:flex;flex-direction:column;align-items:flex-start;line-height:1.1}
+.meter .mtext small{font-size:10px;color:var(--muted)}
+.meter .short{display:none}
+.meter.wet{border-color:var(--wet)}
+.meter.wet .mtext small{color:var(--wet);font-weight:700}
+.meter.damp{border-color:color-mix(in srgb,var(--wet) 55%,var(--line))}
+@keyframes wave{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* tool rail */
+#tools{background-image:var(--grain);grid-row:2;display:flex;flex-direction:column;gap:2px;padding:8px 6px;padding-left:max(6px,env(safe-area-inset-left,0px));border-right:1px solid var(--line);background:var(--chrome);overflow-y:auto}
+.tool{display:flex;flex-direction:column;align-items:center;gap:2px;width:58px;padding:7px 0 5px;border:1px solid transparent;border-radius:12px;background:none;cursor:pointer;color:var(--muted)}
+.tool svg{width:26px;height:26px}
+.tool span{font-size:11px;letter-spacing:.02em}
+.tool:hover{color:var(--ink)}
+.tool[aria-pressed="true"]{background:var(--active);border-color:var(--accent);color:var(--ink)}
+.tool kbd{display:none}
+
+/* stage */
+#stage{grid-row:2;grid-column:2;position:relative;overflow:hidden;background:var(--stage);touch-action:none}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:none}
+#cursor{position:absolute;left:0;top:0;pointer-events:none;border-radius:50%;border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(0,0,0,.55);transform:translate(-100px,-100px);display:none}
+#cursor.dot{border-radius:50%}
+
+/* panels */
+.panel{position:absolute;z-index:5;background-color:var(--panel);background-image:var(--grain);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 26px rgba(60,45,25,.14);padding:12px;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 24px);overflow-y:auto;box-sizing:border-box}
+#props{left:12px;top:12px;width:252px}
+#palette{flex:none;width:100%;aspect-ratio:3/2;max-width:100%;border-radius:8px;border:1px solid var(--line);display:block;touch-action:none;cursor:crosshair;background:#f3f3f1}
+#layers,#settings{right:12px;top:64px;width:250px;max-height:calc(100% - 76px)}
+.mclose{display:none}
+#scrim{position:absolute;inset:0;z-index:6;background:rgba(12,16,22,.26)}
+
+/* selected colour: a small chip on the paper, the colour drawer slides out from it */
+#colorChip{position:absolute;top:12px;right:max(12px,env(safe-area-inset-right,0px));z-index:7;display:flex;align-items:center;gap:8px;height:42px;padding:0 10px 0 6px;border:1px solid var(--line);border-radius:21px;background:color-mix(in srgb,var(--panel) 90%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 4px 14px rgba(0,0,0,.14);cursor:pointer}
+#colorChip .dot{width:30px;height:30px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);flex:none}
+#colorChip .ctext{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;max-width:150px}
+#colorChip .ctext b{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+#colorChip .ctext small{font-size:10.5px;color:var(--muted)}
+#colorChip .chev{width:16px;height:16px;color:var(--muted);transition:transform .25s}
+#colorChip[aria-expanded="true"] .chev{transform:rotate(180deg)}
+#colorChip.muted .dot{opacity:.35}
+#colorChip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#colorDrawer{position:absolute;top:0;right:0;bottom:0;z-index:8;width:min(300px,88vw);box-sizing:border-box;padding:14px;padding-right:max(14px,env(safe-area-inset-right,0px));background-color:var(--panel);background-image:var(--grain);border-left:1px solid var(--line);box-shadow:-10px 0 30px rgba(60,45,25,.18);display:flex;flex-direction:column;gap:12px;overflow-y:auto;transform:translateX(105%);visibility:hidden;transition:transform .28s cubic-bezier(.2,.8,.2,1),visibility 0s .28s}
+#colorDrawer.open{transform:none;visibility:visible;transition:transform .28s cubic-bezier(.2,.8,.2,1),visibility 0s}
+#colorDrawer > *{flex-shrink:0}
+.setchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -2px;padding:2px}
+.setchips::-webkit-scrollbar{display:none}
+.setchips button{flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px 0 6px;border:1px solid var(--line);border-radius:16px;background:var(--panel);cursor:pointer;font-size:12px}
+.setchips button i{display:flex;width:28px;height:14px;border-radius:7px;overflow:hidden}
+.setchips button i b{flex:1}
+.setchips button[aria-pressed="true"]{border-color:var(--accent);background:var(--active);font-weight:700}
+
+/* first-time hint bubble */
+#coach{position:fixed;z-index:45;width:min(300px,calc(100vw - 24px));box-sizing:border-box;padding:14px 14px 12px;background-color:var(--panel);background-image:var(--grain);border:1.5px solid var(--accent);border-radius:16px;box-shadow:0 12px 34px rgba(60,45,25,.25);display:flex;flex-direction:column;gap:6px;animation:pop .25s ease-out}
+#coach b{font-family:var(--font-hand);font-weight:600;font-size:15px}
+#coach p{margin:0;font-size:12.5px;line-height:1.65;color:var(--ink)}
+#coach p em{font-style:normal;font-weight:700;color:var(--wet)}
+#coach .cacts{display:flex;justify-content:flex-end;margin-top:4px}
+#coach .arrow{position:absolute;top:-8px;width:14px;height:14px;background:var(--panel);border-left:1.5px solid var(--accent);border-top:1.5px solid var(--accent);transform:rotate(45deg);left:var(--ax,30px)}
+@keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+/* start screen: resume the saved picture */
+.resume{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+.resume .rlead{margin:-4px 0 0;font-family:var(--font-hand);font-weight:600;font-size:16px}
+.resume img{display:block;width:100%;max-height:46vh;object-fit:contain;border-radius:12px;background:#f4f1ea;box-shadow:0 6px 20px rgba(60,45,25,.18),inset 0 0 0 1px rgba(0,0,0,.06);transform:rotate(-.6deg)}
+.resume small{color:var(--muted);font-size:12px;text-align:center}
+.resume .btn{width:100%}
+.resume .hint{text-align:center}
+
+
+/* start screen: choose the paper */
+#start{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--stage) 70%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));box-sizing:border-box}
+.startcard{--cpx:22px;--cpb:18px;width:min(560px,100%);max-height:100%;overflow-y:auto;overscroll-behavior:contain;box-sizing:border-box;background-color:var(--panel);background-image:var(--grain);border:1px solid var(--line);border-radius:20px;box-shadow:0 20px 60px rgba(60,45,25,.25);padding:22px 22px 18px;display:flex;flex-direction:column;gap:14px}
+.sthead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sthead h1{margin:0;font-family:var(--font-hand);font-weight:600;font-size:28px;letter-spacing:.06em;color:var(--ink);display:flex;align-items:baseline;gap:10px}
+.sthead h1 .mark{color:var(--accent);font-size:32px}
+.lead{margin:-6px 0 0;color:var(--muted);font-size:13.5px}
+.startcard h2{margin:2px 0 -4px;font-family:var(--font-hand);font-weight:600;font-size:16px}
+.papers{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.pcard{display:flex;flex-direction:column;gap:6px;padding:6px 6px 9px;border:1.5px solid var(--line);border-radius:14px;background:var(--panel);cursor:pointer;text-align:left;min-width:0}
+.pcard .thumb{width:100%;aspect-ratio:4/3;border-radius:9px;background-size:cover;background-color:#f4f1ea;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.pcard b{font-size:13px;font-weight:700;padding:0 3px}
+.pcard small{font-size:11px;color:var(--muted);line-height:1.45;padding:0 3px}
+.pcard[aria-pressed="true"]{border-color:var(--accent);background:var(--active)}
+.sizes{display:flex;flex-wrap:wrap;gap:8px}
+.sizes button{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px 0 10px;border:1.5px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;font-size:12.5px}
+.sizes button i{display:block;border:1.5px solid currentColor;border-radius:2px;opacity:.6}
+.sizes button[aria-pressed="true"]{border-color:var(--accent);background:var(--active);font-weight:700}
+.sizes button small{color:var(--muted);font-size:10.5px;font-weight:400}
+.more{align-self:flex-start;border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;padding:4px 0;font-size:13px}
+#moreBox{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px dashed var(--line);border-radius:12px}
+/* the start button stays in view at the bottom of the card, however small the screen */
+.stacts{position:sticky;bottom:calc(-1 * var(--cpb));z-index:2;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin:2px calc(-1 * var(--cpx)) calc(-1 * var(--cpb));padding:14px var(--cpx) var(--cpb);background:linear-gradient(to bottom,color-mix(in srgb,var(--panel) 0%,transparent),var(--panel) 16px);border-radius:0 0 20px 20px}
+.stacts #startWarn{flex-basis:100%;margin:0}
+.btn.big{height:46px;padding:0 22px;font-size:15px;font-weight:700;border-radius:14px}
+#startWarn{color:var(--warn)}
+.stacts .btn.big{box-shadow:0 6px 16px rgba(60,45,25,.18)}
+@media (max-width:560px){ .papers{grid-template-columns:repeat(2,1fr);gap:8px} .pcard .thumb{aspect-ratio:2/1} .startcard{--cpx:16px;--cpb:14px;padding:18px 16px 14px;gap:12px} .sthead h1{font-size:24px} .stacts .btn{flex:1} }
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ptitle{font-family:var(--font-hand);font-weight:600;font-size:15px;letter-spacing:.03em}
+.hint{color:var(--muted);font-size:11.5px;line-height:1.55;margin:0}
+.row{display:grid;grid-template-columns:62px 1fr 38px;align-items:center;gap:8px}
+.row label{font-size:12px;color:var(--muted)}
+.row output{font-family:var(--font-mono);font-size:11px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0;height:22px}
+.seg{display:flex;flex:none;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.seg button{flex:1;height:30px;border:0;border-right:1px solid var(--line);background:none;cursor:pointer;font-size:12px;padding:0 2px}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.sublabel{font-size:12px;color:var(--muted);margin:0 0 -4px}
+.colorcur{display:flex;align-items:center;gap:8px}
+.colorcur .swbig{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);flex:none}
+.colorcur .cn{flex:1;min-width:0;line-height:1.3}
+.colorcur .cn b{display:block;font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.colorcur .cn small{color:var(--muted);font-size:11px}
+.colorcur input[type=color]{width:34px;height:30px;border:1px solid var(--line);border-radius:7px;padding:2px;background:var(--panel);cursor:pointer}
+.swgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.sw{aspect-ratio:1;max-width:100%;border-radius:50%;border:1px solid rgba(0,0,0,.15);cursor:pointer;padding:0;position:relative}
+.sw[aria-pressed="true"]::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--accent)}
+.check{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.45;cursor:pointer}
+.check input{margin-top:2px;accent-color:var(--accent)}
+.divider{height:1px;background:var(--line);margin:2px 0}
+select{height:30px;border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:0 6px;width:100%}
+
+#layerList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+#layerList li{display:grid;grid-template-columns:28px 1fr 58px 18px 26px;align-items:center;gap:6px;padding:5px 6px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+#layerList li.on{border-color:var(--accent);background:var(--active)}
+#layerList .eye,#layerList .del{width:26px;height:26px;border:0;background:none;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;border-radius:6px;padding:0}
+#layerList .eye svg,#layerList .del svg{width:16px;height:16px}
+#layerList .del.confirm{background:var(--warn);color:#fff;width:auto;padding:0 4px;font-size:11px}
+#layerList .lname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+#layerList .wetdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--wet);margin-left:5px;vertical-align:1px}
+#layerList input[type=range]{height:18px}
+#layerList .mv{display:flex;flex-direction:column;gap:1px}
+#layerList .mv button{width:18px;height:13px;border:0;background:none;color:var(--muted);cursor:pointer;padding:0;font-size:9px;line-height:1;border-radius:3px}
+#layerList .mv button:hover{background:var(--active);color:var(--ink)}
+#layerList .mv button:disabled{opacity:.25;cursor:default}
+
+#toast{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:20;background:var(--ink);color:var(--chrome);padding:8px 14px;border-radius:8px;font-size:12.5px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:min(92%,460px);text-align:center;line-height:1.5}
+#toast.show{opacity:1}
+#modal{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-left,0px))}
+#modal .sheet{background:var(--panel);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;max-width:min(900px,100%);max-height:100%;box-sizing:border-box}
+#modal img{max-width:100%;max-height:65vh;object-fit:contain;border:1px solid var(--line);background:#fff;-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}
+#modal .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+#modal a.btn{text-decoration:none}
+#fatal{position:fixed;inset:0;z-index:40;background:var(--chrome);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;line-height:1.7}
+
+@media (max-width:760px){
+  #app{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
+  .brand .name{display:none}
+  #top .lbl{display:none}
+  #stage{grid-row:2;grid-column:1}
+  #tools{grid-row:3;flex-direction:row;border-right:0;border-top:1px solid var(--line);padding:4px max(6px,env(safe-area-inset-right,0px)) 4px max(6px,env(safe-area-inset-left,0px));overflow-x:auto;overflow-y:hidden;justify-content:flex-start}
+  .tool{width:auto;min-width:54px;flex:1 0 auto;padding:5px 4px 3px}
+  .tool svg{width:22px;height:22px}
+  /* phones: tool details, layers and settings float in the middle over a dimmed, still-visible painting */
+  #props,#layers,#settings{left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));max-height:calc(100% - 32px);z-index:9;
+    background:color-mix(in srgb,var(--panel) 84%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 12px 40px rgba(0,0,0,.25);border-radius:14px;padding:14px 16px}
+  .mclose{display:inline-flex}
+  .row{grid-template-columns:76px 1fr 40px;min-height:34px}
+  input[type=range]{height:30px}
+  .seg button{height:36px}
+  #colorChip{height:44px;padding:0 6px;gap:4px}
+  #colorChip .ctext{display:none}
+  #colorChip .dot{width:32px;height:32px}
+  .swgrid{gap:8px}
+  .brand{display:none}
+  #top .meter{min-width:70px;height:40px;padding:0 10px 0 8px;gap:4px}
+  #top .meter .mtext small{font-size:11.5px}
+  #top .meter .long{display:none}
+  #top .meter .short{display:inline}
+  #top .meter{min-width:76px}
+  #top{gap:3px;padding-left:max(6px,env(safe-area-inset-left,0px));padding-right:max(6px,env(safe-area-inset-right,0px))}
+  #top .btn{padding:0 7px;min-width:34px;height:36px}
+  #zoomBtn{padding:0 4px!important;font-size:11px}
+  #handBtn,#zoomOut,#zoomIn{display:none}
+}
+@media (prefers-reduced-motion:reduce){#coach{animation:none}#toast,#colorDrawer,#colorDrawer.open,#colorChip .chev,.meter .fill{transition:none}.meter .wave{animation:none}}
+</style>
+
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div class="brand"><span class="mark">滲</span><span class="name">にじみ帖</span></div>
+    <button class="btn icon" id="undoBtn" title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+    <button class="btn icon" id="redoBtn" title="やり直す (Ctrl+Shift+Z)" aria-label="やり直す" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+    <button class="btn meter" id="dryBtn" title="紙は乾いています" aria-label="乾かす（紙は乾いています）">
+      <span class="fill" id="wetFill"><svg class="wave" viewBox="0 0 80 8" preserveAspectRatio="none" aria-hidden="true"><path d="M0 4 Q10 0 20 4 T40 4 T60 4 T80 4 V8 H0z"/></svg></span>
+      <span class="ticks" aria-hidden="true"></span>
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8c3-2 5 2 8 0s5-2 8 0"/><path d="M3 13c3-2 5 2 8 0s5-2 8 0"/><path d="M3 18c3-2 5 2 8 0s5-2 8 0"/></svg>
+      <span class="mtext"><span class="lbl">乾かす</span><small><span class="long" id="wetText">乾いています</span><span class="short" id="wetShort">乾燥</span></small></span>
+    </button>
+    <span class="spacer"></span>
+    <span class="viewgrp">
+      <button class="btn icon" id="handBtn" aria-pressed="false" title="手のひら：ペンやマウスで紙を動かす (H / スペース長押し)" aria-label="手のひら（紙を動かす）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 10V4a1.5 1.5 0 0 1 3 0v6"/><path d="M14 10V5.5a1.5 1.5 0 0 1 3 0V13"/><path d="M8 11.5a1.5 1.5 0 0 0-3 0V14c0 4 2.7 7 6.5 7h1C16 21 19 18 19 14V9.5a1.5 1.5 0 0 0-2 -1.4"/></svg></button>
+      <button class="btn icon" id="zoomOut" title="縮小 (-)" aria-label="縮小"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M7.5 10.5h6M15.5 15.5 20 20"/></svg></button>
+      <button class="btn mono" id="zoomBtn" title="画面に合わせる (0)">100%</button>
+      <button class="btn icon" id="zoomIn" title="拡大 (+)" aria-label="拡大"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M7.5 10.5h6M10.5 7.5v6M15.5 15.5 20 20"/></svg></button>
+    </span>
+    <button class="btn" id="themeBtn" title="表示の明るさ（自動・ライト・ダーク）"><span id="themeIcon"></span><span class="lbl" id="themeLbl">自動</span></button>
+    <button class="btn" id="paperBtn" title="新しい紙を選ぶ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M12 10v6" stroke-linecap="round"/></svg><span class="lbl">新しい紙</span></button>
+    <button class="btn" id="setBtn" aria-pressed="false" title="紙の質感・にじみ・筆圧の設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span class="lbl">設定</span></button>
+    <button class="btn" id="layBtn" aria-pressed="true" title="レイヤー"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 4 9 5-9 5-9-5z"/><path d="m3 14 9 5 9-5"/></svg><span class="lbl">レイヤー</span></button>
+    <button class="btn primary" id="saveBtn" title="PNG画像として書き出す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg><span class="lbl">画像を保存</span></button>
+  </header>
+
+  <nav id="tools" aria-label="道具"></nav>
+
+  <main id="stage">
+    <canvas id="view"></canvas>
+    <div id="cursor"></div>
+    <div id="scrim" hidden></div>
+
+    <button id="colorChip" aria-expanded="false" aria-controls="colorDrawer" title="色とパレット">
+      <span class="dot" id="chipDot"></span>
+      <span class="ctext"><b id="chipName">ウルトラマリン</b><small>色・パレット</small></span>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>
+    </button>
+
+    <aside id="colorDrawer" aria-label="色とパレット" aria-hidden="true">
+      <div class="ph"><span class="ptitle">色</span><button class="btn icon" id="drawerClose" title="しまう" aria-label="しまう"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div>
+      <div class="colorcur">
+        <span class="swbig" id="swCur"></span>
+        <span class="cn"><b id="colorName">ウルトラマリン</b><small id="colorMeta">粒状性 強</small></span>
+        <input type="color" id="colorPick" title="好きな色を作る" aria-label="好きな色を作る">
+      </div>
+      <p class="hint" id="colorNote" hidden></p>
+      <div class="setchips" id="setChips" aria-label="色のセット"></div>
+      <div class="swgrid" id="swatches"></div>
+      <div class="divider"></div>
+      <div class="ph"><span class="ptitle">パレット</span><button class="btn" id="palWash" style="height:28px;font-size:12px">洗う</button></div>
+      <canvas id="palette" aria-label="混色パレット"></canvas>
+      <div class="seg" id="palSeg"><button data-m="put">置く</button><button data-m="mix">混ぜる</button><button data-m="pick">筆に取る</button></div>
+      <p class="hint" id="palHint">上の色を選んで「置く」、別の色も置いて「混ぜる」、できた色を「筆に取る」で使えます。</p>
+    </aside>
+
+    <section id="props" class="panel" aria-label="道具の調整">
+      <div class="ph"><span class="ptitle" id="toolTitle">水彩筆</span><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <p class="hint" id="toolHint"></p>
+      <div data-show="gouache">
+        <div class="seg" id="shapeSeg"><button data-s="round">丸筆</button><button data-s="flat">平筆</button></div>
+      </div>
+      <div class="row" data-show="pencil gpen brush flat sumi water drop gouache tissue eraser"><label for="size">サイズ</label><input id="size" type="range" min="1" max="200" step="1"><output id="sizeV"></output></div>
+      <div class="row" data-show="brush flat sumi drop gouache"><label for="conc" id="concL">絵の具</label><input id="conc" type="range" min="5" max="300" step="1"><output id="concV"></output></div>
+      <div class="row" data-show="brush flat sumi water drop"><label for="water">水の量</label><input id="water" type="range" min="5" max="150" step="1"><output id="waterV"></output></div>
+      <div class="row" data-show="flat gouache-flat"><label for="angle">筆の角度</label><input id="angle" type="range" min="0" max="179" step="1"><output id="angleV"></output></div>
+      <div class="row" data-show="gouache"><label for="scratch">かすれ</label><input id="scratch" type="range" min="0" max="100" step="1"><output id="scratchV"></output></div>
+      <div class="row" data-show="gouache"><label for="gmix">混色</label><input id="gmix" type="range" min="0" max="100" step="1"><output id="gmixV"></output></div>
+      <div class="row" data-show="tissue eraser"><label for="strength">強さ</label><input id="strength" type="range" min="5" max="100" step="1"><output id="strengthV"></output></div>
+      <div class="row" data-show="brush flat sumi water drop"><label for="vein2">にじみの筋</label><input id="vein2" type="range" min="0" max="200" step="1"><output id="vein2V"></output></div>
+      <div class="row" data-show="brush flat sumi water drop"><label for="drySpd2">乾く速さ</label><input id="drySpd2" type="range" min="10" max="400" step="1"><output id="drySpd2V"></output></div>
+      <div data-show="pencil">
+        <p class="sublabel">芯の硬さ</p>
+        <div class="seg" id="gradeSeg" style="margin-top:8px"></div>
+      </div>
+    </section>
+
+    <section id="layers" class="panel" aria-label="レイヤー">
+      <div class="ph"><span class="ptitle">レイヤー</span><span style="display:flex;gap:6px"><button class="btn" id="addLayer" title="レイヤーを追加">＋ 追加</button><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span></div>
+      <ul id="layerList"></ul>
+      <button class="btn" id="clearLayer">選択中のレイヤーを白紙に戻す</button>
+      <p class="hint">水彩・鉛筆・インクは透明で、重ねると下の色と混ざって深くなります（減法混色）。ガッシュは不透明なので、上のレイヤーほど手前に来ます。<span style="color:var(--wet)">●</span> は濡れた絵の具が乗っているレイヤーです。</p>
+    </section>
+
+    <section id="settings" class="panel" aria-label="紙と設定" hidden>
+      <button class="btn primary" id="paperBtn2">新しい紙を選ぶ</button>
+      <div class="ph"><span class="ptitle">紙の質感<small class="hint" style="font-family:var(--font-ui);margin-left:6px">描いたまま変更できます</small></span><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="seg" id="paperSeg"></div>
+      <div class="row"><label for="bleed">にじみ</label><input id="bleed" type="range" min="20" max="250" step="1" value="100"><output id="bleedV"></output></div>
+      <div class="row"><label for="drySpd">乾く速さ</label><input id="drySpd" type="range" min="10" max="400" step="1" value="100"><output id="drySpdV"></output></div>
+      <div class="row"><label for="vein">にじみの筋</label><input id="vein" type="range" min="0" max="200" step="1" value="140"><output id="veinV"></output></div>
+      <div class="row"><label for="gran">粒状感</label><input id="gran" type="range" min="0" max="200" step="1" value="100"><output id="granV"></output></div>
+      <div class="divider"></div>
+      <div class="ph"><span class="ptitle">入力</span></div>
+      <div class="row"><label for="curve">筆圧</label><input id="curve" type="range" min="40" max="250" step="1" value="100"><output id="curveV"></output></div>
+      <div class="row"><label for="stab">手ぶれ補正</label><input id="stab" type="range" min="0" max="10" step="1" value="2"><output id="stabV"></output></div>
+      <label class="check"><input type="checkbox" id="penOnly"><span>ペンだけで描く（指はスクロールと拡大に使う）</span></label>
+      <label class="check"><input type="checkbox" id="runout" checked><span>筆の水切れでかすれる</span></label>
+      <div class="divider"></div>
+      <div class="ph"><span class="ptitle">保存</span></div>
+      <p class="hint" id="saveInfo">描いた絵は、この端末に1枚だけ自動で保存されます。次に開いたとき「続きから描く」で戻れます。</p>
+      <button class="btn" id="forgetBtn">この端末の保存を消す</button>
+      <div class="divider"></div>
+      <p class="hint">Wacom（Windows）で筆圧が効かないときは、ワコムタブレットのプロパティで「Windows Ink を使う」をオンにしてください。指・マウスは描く速さから筆圧を推定します。</p>
+    </section>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+</div>
+
+<div id="coach" hidden role="dialog" aria-labelledby="coachTitle">
+  <i class="arrow"></i>
+  <b id="coachTitle"></b>
+  <p id="coachText"></p>
+  <div class="cacts"><button class="btn primary" id="coachOk">わかった</button></div>
+</div>
+
+<div id="start" hidden>
+  <div class="startcard" role="dialog" aria-modal="true" aria-labelledby="stTitle">
+    <div class="sthead"><h1 id="stTitle"><span class="mark">滲</span>にじみ帖</h1><button class="btn icon" id="startClose" title="閉じる" aria-label="閉じる" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="resume" id="resume" hidden>
+      <p class="rlead">おかえりなさい。前回の絵が残っています。</p>
+      <img id="resumeImg" alt="前回の絵">
+      <small id="resumeTime"></small>
+      <button class="btn primary big" id="resumeGo">続きから描く</button>
+      <button class="btn big" id="toPick">新しい紙に描く</button>
+      <p class="hint">新しい紙に描きはじめると、この絵は上書きされます。残したいときは、続きを開いて「画像を保存」してください。</p>
+    </div>
+    <div id="stPick" style="display:flex;flex-direction:column;gap:14px">
+    <button class="more" id="backResume" hidden>← 前回の絵に戻る</button>
+    <h2>紙</h2>
+    <div class="papers" id="paperCards"></div>
+    <h2>大きさ</h2>
+    <div class="sizes" id="sizeChips"></div>
+    <button class="more" id="moreBtn" aria-expanded="false" aria-controls="moreBox">細かく設定する ＋</button>
+    <div id="moreBox" hidden>
+      <div class="row"><label>水の計算</label><div class="seg" id="qSeg" style="grid-column:2/4"><button data-q="1">高精細</button><button data-q="0.75">標準</button><button data-q="0.5">軽量</button></div></div>
+      <div class="row"><label for="st_bleed">にじみ</label><input id="st_bleed" type="range" min="20" max="250" step="1"><output id="st_bleedV"></output></div>
+      <div class="row"><label for="st_vein">にじみの筋</label><input id="st_vein" type="range" min="0" max="200" step="1"><output id="st_veinV"></output></div>
+      <div class="row"><label for="st_gran">粒状感</label><input id="st_gran" type="range" min="0" max="200" step="1"><output id="st_granV"></output></div>
+      <div class="row"><label for="st_dry">乾く速さ</label><input id="st_dry" type="range" min="10" max="400" step="1"><output id="st_dryV"></output></div>
+      <p class="hint">「水の計算」は軽いほど速く動きます。スマホで重いときは「軽量」を選んでください。ほかの項目は、描いている途中でも「設定」から変えられます。</p>
+    </div>
+    <div class="stacts">
+      <p class="hint" id="startWarn" hidden>新しい紙にすると、今の絵は消えます（必要なら先に「画像を保存」してください）。</p>
+      <button class="btn" id="startKeep" hidden>紙の質感だけ変える</button>
+      <button class="btn primary big" id="startGo">この紙で描きはじめる</button>
+    </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal" hidden>
+  <div class="sheet">
+    <div class="ph"><span class="ptitle">書き出した画像</span><span class="hint" id="outSize"></span></div>
+    <img id="outImg" alt="書き出した絵">
+    <p class="hint" id="dlHint">ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。</p>
+    <div class="acts"><a class="btn primary" id="dlLink" download="nijimi.png" href="#">PNGをダウンロード</a><button class="btn" id="closeModal">閉じる</button></div>
+  </div>
+</div>
+<div id="fatal" hidden><div><p style="font-size:16px;font-weight:700;margin:0 0 8px">起動できませんでした</p><p id="fatalMsg" class="hint" style="font-size:13px"></p></div></div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const isCoarse = matchMedia('(pointer: coarse)').matches;
+const isNarrow = () => matchMedia('(max-width: 760px)').matches;
+
+function fatal(msg){ $('#fatal').hidden = false; $('#fatalMsg').textContent = msg; }
+
+const canvas = $('#view');
+const gl = canvas.getContext('webgl2', { antialias:false, alpha:false, depth:false, stencil:false, premultipliedAlpha:false, preserveDrawingBuffer:false, powerPreference:'high-performance' });
+if (!gl) { fatal('このブラウザは WebGL2 に対応していないため、水彩シミュレーションを動かせません。最新の Chrome・Edge・Safari・Firefox でお試しください。'); return; }
+if (!gl.getExtension('EXT_color_buffer_float')) { fatal('このGPU/ブラウザは浮動小数点の描画（EXT_color_buffer_float）に対応していないため、水彩シミュレーションを動かせません。'); return; }
+
+/* ================= GLSL ================= */
+const HEAD = `#version 300 es
+precision highp float; precision highp int; precision highp sampler2D;
+`;
+const NOISE = `
+float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+vec2 hash22(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * vec3(.1031,.1030,.0973)); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz) * p3.zy); }
+float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.-2.*f);
+  return mix(mix(hash12(i), hash12(i+vec2(1,0)), u.x), mix(hash12(i+vec2(0,1)), hash12(i+vec2(1,1)), u.x), u.y); }
+float fbm(vec2 p){ float s = 0., a = .5; for(int i=0;i<5;i++){ s += a*vnoise(p); p = p*2.03 + 17.1; a *= .5; } return s/.97; }
+float worley(vec2 p){ vec2 i = floor(p), f = fract(p); float md = 8.;
+  for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g = vec2(x,y); vec2 r = g + hash22(i+g) - f; md = min(md, dot(r,r)); } return sqrt(md); }
+`;
+const VS_FULL = HEAD + `
+out vec2 v_uv;
+void main(){ vec2 p = vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2)); v_uv = p; gl_Position = vec4(p*2.-1., 0., 1.); }`;
+
+const VS_DAB = HEAD + `
+layout(location=0) in vec4 i_a;   // x, y, radius, pressure
+layout(location=1) in vec4 i_b;   // dir/tilt x, y, reservoir, seed
+uniform vec2 u_doc; uniform float u_pad;
+out vec2 v_local; out vec2 v_docpx; flat out vec4 v_a; flat out vec4 v_b;
+void main(){
+  vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1)) * 2. - 1.;
+  float ext = i_a.z * (1. + length(i_b.xy) * u_pad) + 2.;
+  vec2 off = c * ext;
+  v_local = off; v_docpx = i_a.xy + off; v_a = i_a; v_b = i_b;
+  gl_Position = vec4(v_docpx / u_doc * 2. - 1., 0., 1.);
+}`;
+
+const DAB_IN = `
+in vec2 v_local; in vec2 v_docpx; flat in vec4 v_a; flat in vec4 v_b;
+uniform vec2 u_doc; uniform sampler2D u_paper; uniform float u_plod;
+`;
+
+/* paper height map: r = height, g = fibre, b = random */
+const FS_PAPER = HEAD + NOISE + `
+uniform float u_seed, u_scale, u_bump, u_large, u_fine, u_fiber;
+out vec4 o;
+float fiberLayer(vec2 p, float ang, float s){
+  vec2 d = vec2(cos(ang), sin(ang)); vec2 q = vec2(dot(p,d), dot(p, vec2(-d.y,d.x)));
+  float n = vnoise(vec2(q.x/38., q.y/1.5) + s);
+  return pow(1. - abs(n*2.-1.), 7.);
+}
+void main(){
+  vec2 p = gl_FragCoord.xy + u_seed * 131.7;
+  float w1 = worley(p / u_scale);
+  float w2 = worley(p / (u_scale*.55) + 5.3);
+  float bumps = (1. - smoothstep(.05, .9, w1)) * .65 + (1. - smoothstep(.05, .9, w2)) * .35;
+  float large = fbm(p / (u_scale*4.5));
+  float fine = fbm(p / 1.6);
+  float fib = 0.;
+  for(int i=0;i<5;i++){ float a = hash12(vec2(float(i)*3.1, u_seed)) * 3.14159; fib = max(fib, fiberLayer(p, a, float(i)*7.3) * (.55 + .45*hash12(vec2(u_seed, float(i))))); }
+  float h = bumps*u_bump + large*u_large + fine*u_fine + fib*u_fiber*.6;
+  float mean = (u_bump + u_large + u_fine)*.5 + u_fiber*.05;
+  float tot = u_bump + u_large + u_fine + u_fiber*.4;
+  h = clamp(.5 + (h - mean) / max(tot, 1e-3) * 1.45, 0., 1.);
+  vec2 vp = p / 26.;
+  vec2 warp = vec2(fbm(vp * .45 + 1.3), fbm(vp * .45 + 7.1)) * 2.6;
+  float r1 = 1. - abs(vnoise(vp + warp) * 2. - 1.);
+  float r2 = 1. - abs(vnoise(vp * 2.3 + warp * 1.6 + 4.2) * 2. - 1.);
+  float r3 = 1. - abs(vnoise(vp * 5.3 + warp * 2.4 + 9.7) * 2. - 1.);
+  float vein = max(pow(r1, 9.), max(pow(r2, 12.) * .85, pow(r3, 16.) * .6));
+  vein = max(vein, fib * .7);
+  o = vec4(h, fib, hash12(p), vein);
+}`;
+
+/* ---- watercolour simulation: virtual-pipe shallow water + pigment transport ---- */
+const SIM_COMMON = `
+uniform sampler2D u_paper; uniform float u_fiberThr, u_plod;
+ivec2 SZ;
+vec4 paperAt(ivec2 c){ return textureLod(u_paper, (vec2(c)+.5)/vec2(SZ), u_plod); }
+uniform float u_vein;
+float thrSrc(ivec2 c){ vec4 p = paperAt(c); float t = mix(p.r, 1. - p.g, u_fiberThr); return mix(t, t * (1. - p.a), clamp(u_vein * .45, 0., .9)); }
+bool inside(ivec2 q){ return q.x>=0 && q.y>=0 && q.x<SZ.x && q.y<SZ.y; }
+`;
+const FS_FLUX = HEAD + NOISE + SIM_COMMON + `
+uniform sampler2D u_W, u_F;
+uniform float u_g, u_damp, u_slope, u_openB, u_openV, u_time;
+out vec4 o;
+void main(){
+  SZ = textureSize(u_W, 0);
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  vec4 W = texelFetch(u_W, c, 0);
+  float h = W.r;
+  if(h < 1e-4){ o = vec4(0); return; }
+  float hc = h + paperAt(c).r * u_slope;
+  vec4 f = texelFetch(u_F, c, 0) * u_damp;
+  ivec2 n[4] = ivec2[4](c+ivec2(-1,0), c+ivec2(1,0), c+ivec2(0,-1), c+ivec2(0,1));
+  vec4 nf = vec4(0);
+  for(int i=0;i<4;i++){
+    ivec2 q = n[i];
+    if(!inside(q)) continue;
+    vec4 Wq = texelFetch(u_W, q, 0);
+    float hq = Wq.r + paperAt(q).r * u_slope;
+    bool open = Wq.r > 1e-4 || Wq.g > u_openB + u_openV * thrSrc(q);
+    float jit = 1. + .8 * (vnoise(vec2(q) * .13 + vec2(u_time * .031, -u_time * .019)) - .5) + .3 * (hash12(vec2(q) * .731 + vec2(c) * .113 + u_time) - .5);
+    jit = mix(jit, jit * (.4 + 1.6 * paperAt(q).a), clamp(u_vein * .4, 0., .8));
+    nf[i] = open ? max(0., f[i] + u_g * (hc - hq) * jit) : 0.;
+  }
+  float tot = nf.x + nf.y + nf.z + nf.w;
+  if(tot > 0.) nf *= min(1., h * .45 / tot);
+  o = nf;
+}`;
+const FS_UPDATE = HEAD + NOISE + SIM_COMMON + `
+uniform sampler2D u_W, u_F, u_P, u_D;
+uniform float u_evap, u_edgeEvap, u_absorb, u_sCost, u_capK, u_delta, u_sigB, u_sigV, u_evapS;
+uniform float u_dep, u_depDry, u_desorb, u_pdiff, u_granStr, u_bloom;
+layout(location=0) out vec4 oW; layout(location=1) out vec4 oP; layout(location=2) out vec4 oD;
+void main(){
+  SZ = textureSize(u_W, 0);
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  vec4 W = texelFetch(u_W,c,0), F = texelFetch(u_F,c,0), P = texelFetch(u_P,c,0), D = texelFetch(u_D,c,0);
+  float h = W.r, s = W.g;
+  float outF = F.x + F.y + F.z + F.w;
+  float hn = h - outF;
+  vec4 Pn = P * (1. - (h > 1e-5 ? clamp(outF / h, 0., 1.) : 0.));
+  ivec2 off[4] = ivec2[4](ivec2(-1,0), ivec2(1,0), ivec2(0,-1), ivec2(0,1));
+  int opp[4] = int[4](1, 0, 3, 2);
+  float sigC = u_sigB + u_sigV * thrSrc(c);
+  float inS = 0., outS = 0., dryN = 0., hNmax = 0., finT = 0.;
+  for(int i=0;i<4;i++){
+    ivec2 q = c + off[i];
+    if(!inside(q)){ dryN += 1.; continue; }
+    vec4 Wq = texelFetch(u_W,q,0), Fq = texelFetch(u_F,q,0), Pq = texelFetch(u_P,q,0);
+    float fin = Fq[opp[i]];
+    hn += fin; finT += fin;
+    if(fin > 0. && Wq.r > 1e-5) Pn += Pq * clamp(fin / Wq.r, 0., 1.);
+    if(h > 1e-4 && Wq.r > 1e-4){
+      float wd = clamp(min(h, Wq.r) / .1, 0., 1.) * (.25 + .9 * vnoise(vec2(c + q) * .07 + 3.7) + .6 * vnoise(vec2(c + q) * .21 + 9.1));
+      float vv = .5 * (paperAt(c).a + paperAt(q).a);
+      float cond = mix(1., .12 + 2.6 * vv * vv, clamp(u_vein, 0., 1.)) * (1. + max(0., u_vein - 1.) * 1.5 * vv);
+      Pn += min(.12, u_pdiff * wd * cond) * (Pq - P);   // capped: with the 45% advection limit the cell never gives away more than it holds
+    }
+    if(Wq.r < 1e-4 && Wq.g < .5) dryN += 1.;
+    hNmax = max(hNmax, Wq.r);
+    float sq = Wq.g;
+    float sigQ = u_sigB + u_sigV * thrSrc(q);
+    if(sq > sigQ && s >= u_delta) inS += max(0., sq - s);
+    if(s > sigC && sq >= u_delta) outS += max(0., s - sq);
+  }
+  ivec2 dg[4] = ivec2[4](ivec2(-1,-1), ivec2(1,-1), ivec2(-1,1), ivec2(1,1));
+  for(int i=0;i<4;i++){ ivec2 q = c + dg[i]; if(!inside(q)) { dryN += 1.; continue; } vec4 Wd = texelFetch(u_W,q,0); if(Wd.r < 1e-4 && Wd.g < .5) dryN += 1.; }
+  s += u_capK * .25 * (inS - outS);
+  if(hn > 1e-4){ float a = u_absorb * (1. - s); s += a; hn -= a * u_sCost; }
+  hn -= u_evap * (1. + u_edgeEvap * dryN / 8.);
+  if(hn <= 1e-4){ hn = 0.; s -= u_evapS; }
+  s = clamp(s, 0., 1.);
+  float pap = paperAt(c).r;
+  float gm = dot(Pn.rgb, vec3(1./3.));
+  float g = clamp(Pn.a / (gm + 1e-5), 0., 1.);
+  float dep = u_dep * (1. + g * u_granStr * (1.8 * (1. - pap) - .3)) + u_depDry * (1. - smoothstep(0., .04, max(hn, hNmax * .5)));
+  dep = clamp(dep, 0., 1.);
+  float damp = (W.g > u_delta && W.g < .97) ? 1. : 0.;   // re-wetted damp paper: pigment not yet bonded
+  float des = clamp(u_desorb * smoothstep(.08, .8, hn) + u_bloom * finT * (.06 + damp) + .05 * damp * smoothstep(.02, .2, hn), 0., .5);
+  vec4 dP = Pn * dep, dD = D * des;
+  Pn += dD - dP; D += dP - dD;
+  if(hn <= 0.){ D += Pn; Pn = vec4(0); }
+  oW = vec4(min(hn, 3.), s, 0., 0.);
+  oP = max(Pn, 0.);
+  oD = max(D, 0.);
+}`;
+const FS_FINALIZE = HEAD + `
+uniform sampler2D u_P, u_D;
+layout(location=0) out vec4 oW; layout(location=1) out vec4 oP; layout(location=2) out vec4 oD;
+void main(){ ivec2 c = ivec2(gl_FragCoord.xy); oW = vec4(0); oP = vec4(0); oD = texelFetch(u_D,c,0) + texelFetch(u_P,c,0); }`;
+
+const FS_WETMAP = HEAD + `
+uniform sampler2D u_W; uniform vec2 u_size;
+out vec4 o;
+void main(){ vec4 w = texture(u_W, gl_FragCoord.xy / u_size); o = vec4(clamp(w.r * 10., 0., 1.), clamp(w.g, 0., 1.), 0., 1.); }`;
+const FS_SUM = HEAD + `
+uniform sampler2D u_P, u_D;
+out vec4 o;
+void main(){ ivec2 c = ivec2(gl_FragCoord.xy); o = texelFetch(u_D, c, 0) + texelFetch(u_P, c, 0); }`;
+const FS_REDUCE = HEAD + `
+uniform sampler2D u_W; uniform ivec2 u_block;
+out vec4 o;
+void main(){
+  ivec2 SZ = textureSize(u_W, 0); ivec2 b = ivec2(gl_FragCoord.xy) * u_block; float mh = 0., ms = 0.;
+  for(int y=0;y<64;y++){ if(y >= u_block.y) break; for(int x=0;x<64;x++){ if(x >= u_block.x) break;
+    ivec2 q = b + ivec2(x,y); if(q.x >= SZ.x || q.y >= SZ.y) continue; vec4 w = texelFetch(u_W, q, 0); mh = max(mh, w.r); ms = max(ms, w.g); } }
+  o = vec4(mh, ms, 0., 1.);
+}`;
+const GRAN = `
+uniform float u_granStr;
+float granMod(vec4 d, float pap){ float g = clamp(d.a / (dot(d.rgb, vec3(1./3.)) + 1e-4), 0., 1.); return mix(1., .6 + .8 * (1. - pap), g * u_granStr * .85); }
+`;
+const FS_BAKE = HEAD + GRAN + `
+uniform sampler2D u_P, u_D, u_paper; uniform vec2 u_doc;
+out vec4 o;
+void main(){ vec2 uv = gl_FragCoord.xy / u_doc; vec4 d = texture(u_D, uv), p = texture(u_P, uv); float pap = textureLod(u_paper, uv, 0.).r;
+  o = vec4(d.rgb * granMod(d, pap) + p.rgb, 0.); }`;
+
+const FS_COMP = HEAD + GRAN + `
+uniform sampler2D u_L0,u_L1,u_L2,u_L3,u_L4,u_L5,u_L6,u_L7;
+uniform float u_op[8];
+uniform sampler2D u_W, u_P, u_D, u_paper;
+uniform float u_wetOp, u_shade; uniform vec3 u_paperCol, u_bg, u_gouache; uniform int u_wetIdx;
+uniform vec2 u_doc, u_canvas; uniform vec3 u_view; uniform int u_export;
+out vec4 o;
+void main(){
+  vec2 sp = gl_FragCoord.xy; if(u_export == 0) sp.y = u_canvas.y - sp.y;
+  vec2 dp = (sp - u_view.xy) / u_view.z;
+  if(dp.x < 0. || dp.y < 0. || dp.x > u_doc.x || dp.y > u_doc.y){
+    vec2 q = max(max(-dp, dp - u_doc), 0.) * u_view.z;
+    float sh = exp(-length(q) * .09) * .22;
+    vec2 gq = floor(sp / 1.5); float grain = fract(sin(dot(gq, vec2(12.9898, 78.233))) * 43758.5453);
+    o = vec4(u_bg * (1. - sh) * (.988 + .024 * grain), 1.); return;
+  }
+  vec2 uv = dp / u_doc;
+  vec4 Wt = texture(u_W, uv), Dt = texture(u_D, uv), Pt = texture(u_P, uv);
+  float plod = max(0., log2(1. / u_view.z));
+  float pap = textureLod(u_paper, uv, plod).r;
+  float wet = clamp(Wt.g, 0., 1.);
+  vec3 wetA = (Dt.rgb * granMod(Dt, pap) + Pt.rgb) * (1. + .22 * wet);
+  vec2 ts = max(1., 1. / u_view.z) / u_doc;
+  float hx = textureLod(u_paper, uv + vec2(ts.x,0), plod).r - textureLod(u_paper, uv - vec2(ts.x,0), plod).r;
+  float hy = textureLod(u_paper, uv + vec2(0,ts.y), plod).r - textureLod(u_paper, uv - vec2(0,ts.y), plod).r;
+  float shade = 1. + (hx + hy) * .1 * u_shade;
+  float relief = 1. - (1. - pap) * .03 * u_shade;
+  vec3 base = u_paperCol * shade * relief * (1. - .07 * wet);
+  vec3 col = base;
+  vec3 gw = u_gouache * mix(1., shade, .45);
+  #define LAYER(T, I) { vec4 l = texture(T, uv); float op = u_op[I]; vec3 A = l.rgb + (u_wetIdx == I ? wetA : vec3(0)); col = mix(col, gw, clamp(l.a, 0., 1.) * op) * exp(-A * op); }
+  LAYER(u_L0, 0) LAYER(u_L1, 1) LAYER(u_L2, 2) LAYER(u_L3, 3) LAYER(u_L4, 4) LAYER(u_L5, 5) LAYER(u_L6, 6) LAYER(u_L7, 7)
+  vec2 wt = 1. / vec2(textureSize(u_W, 0));
+  float wx = texture(u_W, uv + vec2(wt.x,0)).r - texture(u_W, uv - vec2(wt.x,0)).r;
+  float wy = texture(u_W, uv + vec2(0,wt.y)).r - texture(u_W, uv - vec2(0,wt.y)).r;
+  vec3 n = normalize(vec3(-wx * 7., wy * 7., 1.));
+  vec3 hv = normalize(normalize(vec3(-.45, .55, 1.)) + vec3(0,0,1));
+  float spec = pow(max(dot(n, hv), 0.), 70.) * smoothstep(.01, .3, Wt.r) * .4 * u_wetOp;
+  col += spec;
+  o = vec4(clamp(col, 0., 1.), 1.);
+}`;
+
+/* ---- dab shaders ---- */
+const SHAPE = `
+uniform float u_shape, u_hard, u_seed;
+// brush tip footprint: 0 round, 1 flat (chisel edge along dir), 2 falling drop
+float tipMask(vec2 l, float r, vec2 dir, float p, float pap, out float along){
+  if(u_shape > 1.5){
+    float d = length(l) / r + (vnoise(v_docpx * .22 + u_seed * 3.) - .5) * .22 + (pap - .5) * .08;
+    along = 0.; return clamp(1. - d * d, 0., 1.);
+  }
+  vec2 e = length(dir) > .001 ? normalize(dir) : vec2(1,0);
+  if(u_shape > .5){
+    vec2 q = vec2(dot(l, e), dot(l, vec2(-e.y, e.x)));
+    float t = r * (.15 + .13 * p);
+    float ax = abs(q.x) / r + (vnoise(vec2(q.y * .6, u_seed * 5.)) - .5) * .07;
+    float ay = abs(q.y) / t + (pap - .5) * .18 + (vnoise(v_docpx * .3 + u_seed) - .5) * .15;
+    along = q.x / r;
+    return (1. - smoothstep(u_hard, 1., ax)) * (1. - smoothstep(.55, 1., ay));
+  }
+  along = dot(l, vec2(-e.y, e.x)) / r;
+  float d = length(l) / r + (pap - .5) * .1 + (vnoise(v_docpx * .15 + u_seed) - .5) * .08;
+  return 1. - smoothstep(u_hard, 1., d);
+}
+`;
+const FS_BRUSH = HEAD + NOISE + DAB_IN + SHAPE + `
+uniform vec3 u_pig; uniform float u_gran, u_wAmt, u_pAmt, u_dFrac;
+layout(location=0) out vec4 oW; layout(location=1) out vec4 oP; layout(location=2) out vec4 oD;
+void main(){
+  float r = v_a.z; if(length(v_local) > r * 1.12 + 1.) discard;
+  float p = v_a.w; float res = v_b.z; float k = v_b.w;
+  float pap = textureLod(u_paper, v_docpx / u_doc, u_plod).r;
+  float along; float fall = tipMask(v_local, r, v_b.xy, p, pap, along);
+  if(fall <= 0.) discard;
+  float bristle = vnoise(vec2(along * 9. + u_seed * 13., u_seed * 3.));
+  float thr = 1. - res * 1.7 + (bristle - .5) * .7 * (1. - res);
+  float m = fall * smoothstep(thr - .1, thr + .1, pap + (hash12(v_docpx) - .5) * .12) * k;
+  oW = vec4(u_wAmt * m * (.35 + .65*res) * (.5 + .5*p), 0., 0., 0.);
+  float pa = u_pAmt * m * (.5 + .5*res) * (.4 + .6*p);
+  vec4 pig = vec4(u_pig * pa, u_gran * dot(u_pig, vec3(1./3.)) * pa);
+  oP = pig * (1. - u_dFrac);
+  oD = pig * u_dFrac;   // part that soaks straight into the fibres (keeps tendrils crisp)
+}`;
+const FS_SIMERASE = HEAD + NOISE + DAB_IN + SHAPE + `
+uniform float u_aW, u_aP, u_aD, u_tissue, u_scratch;
+layout(location=0) out vec4 oW; layout(location=1) out vec4 oP; layout(location=2) out vec4 oD;
+void main(){
+  if(length(v_local) > v_a.z * 1.12 + 1.) discard;
+  float along; float m = tipMask(v_local, v_a.z, v_b.xy, v_a.w, .5, along) * v_b.w;
+  if(m <= 0.) discard;
+  if(u_tissue > 1.5){
+    // gouache cover: the same coverage the opaque paint gets on the layer
+    float pap = textureLod(u_paper, v_docpx / u_doc, u_plod).r;
+    float along2; float fall = tipMask(v_local, v_a.z, v_b.xy, v_a.w, pap, along2);
+    float bristle = vnoise(vec2(along2 * 11. + u_seed * 13., u_seed * 3.));
+    float res = v_b.z; float thr = 1. - res * 1.5 * (1. - .55 * u_scratch) + (bristle - .5) * (.8 * (1. - res) + .7 * u_scratch);
+    float dry = smoothstep(thr - .08, thr + .08, pap + (hash12(v_docpx) - .5) * .1);
+    float cov = clamp(fall * dry * u_aP * v_b.w * (.45 + .55 * v_a.w) * mix(.75 + .25 * bristle, .25 + .75 * bristle, u_scratch), 0., 1.);
+    oW = vec4(0); oP = vec4(0,0,0,cov); oD = vec4(0,0,0,cov); return;
+  }
+  if(u_tissue > .5){ vec2 q = v_docpx * .03 + u_seed * 7.; float c = fbm(q); float ridge = 1. - abs(fbm(q * 1.9 + 3.) * 2. - 1.);
+    m *= smoothstep(.42, .62, c * .55 + ridge * .5); }
+  m *= .5 + .5 * v_a.w;
+  oW = vec4(0,0,0, clamp(u_aW*m, 0., 1.)); oP = vec4(0,0,0, clamp(u_aP*m, 0., 1.)); oD = vec4(0,0,0, clamp(u_aD*m, 0., 1.));
+}`;
+const FS_GOUACHE = HEAD + NOISE + DAB_IN + SHAPE + `
+uniform vec3 u_col; uniform float u_alpha, u_scratch, u_mix, u_simOn;
+uniform sampler2D u_cur, u_P, u_D;
+out vec4 o;
+void main(){
+  float r = v_a.z; if(length(v_local) > r * 1.12 + 1.) discard;
+  float p = v_a.w; float res = v_b.z;
+  vec2 uv = v_docpx / u_doc;
+  float pap = textureLod(u_paper, uv, u_plod).r;
+  float along; float fall = tipMask(v_local, r, v_b.xy, p, pap, along);
+  if(fall <= 0.) discard;
+  float bristle = vnoise(vec2(along * 11. + u_seed * 13., u_seed * 3.));
+  float thr = 1. - res * 1.5 * (1. - .55 * u_scratch) + (bristle - .5) * (.8 * (1. - res) + .7 * u_scratch);
+  float dry = smoothstep(thr - .08, thr + .08, pap + (hash12(v_docpx) - .5) * .1);
+  float cov = clamp(fall * dry * u_alpha * v_b.w * (.45 + .55 * p) * mix(.75 + .25 * bristle, .25 + .75 * bristle, u_scratch), 0., 1.);
+  // pick up the paint that is already there (same layer, and the wet wash if it belongs to it)
+  vec4 cur = texture(u_cur, uv);
+  // the layer keeps gouache premultiplied by its coverage; undo that so a half-covered edge has its real colour
+  vec3 under = cur.rgb / mix(1., max(cur.a, .2), step(.01, cur.a)) + u_simOn * (texture(u_D, uv).rgb + texture(u_P, uv).rgb);
+  float there = clamp(max(dot(under, vec3(1./3.)) * 2.5, cur.a), 0., 1.);
+  vec3 col = mix(u_col, under, u_mix * there);
+  o = vec4(col * cov, cov);
+}`;
+const FS_LAYERERASE = HEAD + DAB_IN + `
+uniform float u_a;
+out vec4 o;
+void main(){ float d = length(v_local) / v_a.z; if(d > 1.) discard; float m = (1. - smoothstep(.55, 1., d)) * (.4 + .6 * v_a.w); o = vec4(0,0,0, clamp(u_a*m, 0., 1.)); }`;
+const FS_PENCIL = HEAD + NOISE + DAB_IN + `
+uniform sampler2D u_cur; uniform vec3 u_col; uniform float u_maxD, u_str, u_soft, u_seed, u_opaque;
+out vec4 o;
+void main(){
+  vec2 t = v_b.xy; float tl = clamp(length(t), 0., 1.);
+  vec2 dir = tl > .01 ? t / tl : vec2(1,0);
+  float stretch = 1. + tl * 2.6;
+  vec2 q = vec2(dot(v_local, dir), dot(v_local, vec2(-dir.y, dir.x)));
+  q.x /= stretch;
+  float d = length(q) / v_a.z; if(d > 1.) discard;
+  float fall = 1. - smoothstep(mix(.55, .1, tl), 1., d);
+  vec2 uv = v_docpx / u_doc;
+  float pap = textureLod(u_paper, uv, u_plod).r;
+  float p = v_a.w;
+  float press = (.18 + .9 * p) * (.75 + .25 * u_soft) * (1. - .35 * tl);
+  float thr = 1. - press;
+  float n = hash12(floor(v_docpx) + u_seed);
+  float cov = smoothstep(thr - .12, thr + .12, pap + (n - .5) * .28);
+  vec3 cur = texture(u_cur, uv).rgb;
+  float sat = 1. - clamp(dot(cur, vec3(1./3.)) / u_maxD, 0., 1.);
+  if(u_opaque > .5){
+    // white pencil: chalky, opaque specks that build up to a limit
+    float a = cov * fall * u_str * 1.6 * (.35 + .65 * p) * (1. - clamp(texture(u_cur, uv).a / .85, 0., 1.));
+    o = vec4(u_col * a, a); return;
+  }
+  float amt = cov * fall * u_str * (.35 + .65 * p) * sat;
+  o = vec4(u_col * amt, 0.);
+}`;
+const FS_PEN = HEAD + DAB_IN + `
+uniform vec3 u_ink; uniform float u_rough, u_opaque;
+out vec4 o;
+void main(){
+  float r = v_a.z; float d = length(v_local);
+  float pap = textureLod(u_paper, v_docpx / u_doc, u_plod).r;
+  float edge = r + (pap - .5) * u_rough * min(r, 2.5);
+  float cov = clamp(edge - d + .5, 0., 1.);
+  if(cov <= 0.) discard;
+  float dens = mix(.6, 1., smoothstep(.4, 2.5, r));
+  if(u_opaque > .5){ float a = cov * mix(.85, 1., smoothstep(.4, 2.5, r)); o = vec4(u_ink * a, a); }   // white ink covers what is below
+  else o = vec4(u_ink * cov * dens, 0.);
+}`;
+
+/* ================= GL helpers ================= */
+function shader(type, src){
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(s); console.error(log); throw new Error(log); }
+  return s;
+}
+function program(vs, fs){
+  const p = gl.createProgram();
+  gl.attachShader(p, shader(gl.VERTEX_SHADER, vs)); gl.attachShader(p, shader(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const inf = gl.getActiveUniform(p, i); u[inf.name.replace(/\[0\]$/, '')] = { loc: gl.getUniformLocation(p, inf.name), type: inf.type, size: inf.size }; }
+  return { p, u };
+}
+function use(P, U){
+  gl.useProgram(P.p); let unit = 0;
+  for (const k in U) {
+    const u = P.u[k]; if (!u) continue; const v = U[k];
+    switch (u.type) {
+      case gl.SAMPLER_2D: gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, v); gl.uniform1i(u.loc, unit++); break;
+      case gl.FLOAT: u.size > 1 ? gl.uniform1fv(u.loc, v) : gl.uniform1f(u.loc, v); break;
+      case gl.FLOAT_VEC2: gl.uniform2fv(u.loc, v); break;
+      case gl.FLOAT_VEC3: gl.uniform3fv(u.loc, v); break;
+      case gl.FLOAT_VEC4: gl.uniform4fv(u.loc, v); break;
+      case gl.INT_VEC2: gl.uniform2iv(u.loc, v); break;
+      default: gl.uniform1i(u.loc, v);
+    }
+  }
+}
+function mkTex(w, h, kind = 'f16'){
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  if (kind === 'u8' || kind === 'u8mip') gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, kind === 'u8mip' ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  t.w = w; t.h = h; return t;
+}
+function mkFbo(texs){
+  const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  texs.forEach((t, i) => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0));
+  gl.drawBuffers(texs.map((_, i) => gl.COLOR_ATTACHMENT0 + i));
+  const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  if (st !== gl.FRAMEBUFFER_COMPLETE) throw new Error('framebuffer incomplete ' + st);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  f.w = texs[0].w; f.h = texs[0].h; f.n = texs.length; return f;
+}
+function target(f){ gl.bindFramebuffer(gl.FRAMEBUFFER, f); if (f) gl.viewport(0, 0, f.w, f.h); else gl.viewport(0, 0, canvas.width, canvas.height); }
+function clearF(f){ target(f); for (let i = 0; i < (f ? f.n : 1); i++) gl.clearBufferfv(gl.COLOR, i, [0, 0, 0, 0]); }
+function blit(src, dst, sx, sy, w, h, dx, dy){
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, src); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, dst);
+  gl.blitFramebuffer(sx, sy, sx + w, sy + h, dx, dy, dx + w, dy + h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+}
+function freeTF(t, f){ if (f) gl.deleteFramebuffer(f); if (t) gl.deleteTexture(t); }
+
+let progs;
+try {
+  progs = {
+    paper: program(VS_FULL, FS_PAPER), flux: program(VS_FULL, FS_FLUX), update: program(VS_FULL, FS_UPDATE),
+    finalize: program(VS_FULL, FS_FINALIZE), bake: program(VS_FULL, FS_BAKE), comp: program(VS_FULL, FS_COMP),
+    brush: program(VS_DAB, FS_BRUSH), simErase: program(VS_DAB, FS_SIMERASE), layerErase: program(VS_DAB, FS_LAYERERASE),
+    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE),
+  };
+} catch (err) { fatal('シェーダーの準備に失敗しました: ' + err.message); console.error(err); return; }
+
+const emptyVAO = gl.createVertexArray();
+const dabVAO = gl.createVertexArray(); const dabBuf = gl.createBuffer();
+gl.bindVertexArray(dabVAO); gl.bindBuffer(gl.ARRAY_BUFFER, dabBuf);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(0, 1);
+gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(1, 1);
+gl.bindVertexArray(null);
+const dummy = mkTex(1, 1); { const f = mkFbo([dummy]); clearF(f); gl.deleteFramebuffer(f); }
+function drawFull(){ gl.bindVertexArray(emptyVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+
+/* ================= data ================= */
+const PAPERS = {
+  cold:  { label:'中目',  scale:9,  bump:.8,  large:.25, fine:.22, fiber:.08, delta:.12, sigB:.3,  sigV:.35, openB:.35, openV:.4,  fiberThr:0,  capK:.05, absorb:.12, sCost:.04, col:[.968,.958,.93], shade:1,
+           hint:'水彩紙・中目。ほどよい凹凸で粒状感とにじみが出やすい、標準的な紙です。' },
+  rough: { label:'荒目',  scale:15, bump:1,   large:.4,  fine:.2,  fiber:.05, delta:.12, sigB:.3,  sigV:.4,  openB:.35, openV:.45, fiberThr:0,  capK:.05, absorb:.12, sCost:.04, col:[.972,.962,.935], shade:1.35,
+           hint:'水彩紙・荒目。凹凸が深く、かすれと顔料の沈殿が強く出ます。' },
+  hot:   { label:'細目',  scale:5,  bump:.22, large:.15, fine:.3,  fiber:.04, delta:.15, sigB:.35, sigV:.3,  openB:.4,  openV:.35, fiberThr:0,  capK:.04, absorb:.1,  sCost:.04, col:[.975,.97,.955], shade:.5,
+           hint:'細目（ケント紙に近い）。表面がなめらかで、鉛筆やペンの線がきれいに出ます。' },
+  washi: { label:'和紙',  scale:6,  bump:.15, large:.2,  fine:.25, fiber:1,   delta:0,   sigB:.03, sigV:.3,  openB:.1,  openV:.32, fiberThr:.5, capK:.22, absorb:.35, sCost:.06, col:[.957,.94,.9], shade:.55,
+           hint:'にじみ止めのない和紙。繊維に沿って墨や絵の具が広がります。' },
+};
+const WHITE_GOUACHE = { name:'ホワイト', hex:'#f8f7f3', gran:0, white:true };
+const COLOR_SETS = {
+  classic:{ label:'水彩', colors:[
+  { name:'パーマネントイエロー', hex:'#f1c40f', gran:.05 },
+  { name:'イエローオーカー',     hex:'#c8963e', gran:.55 },
+  { name:'バーミリオン',         hex:'#e04a2b', gran:.25 },
+  { name:'パーマネントローズ',   hex:'#d23a6a', gran:.05 },
+  { name:'バーントシェンナ',     hex:'#9c4f2c', gran:.65 },
+  { name:'ローアンバー',         hex:'#7a5c3a', gran:.6 },
+  { name:'ウルトラマリン',       hex:'#2a3f9d', gran:.95 },
+  { name:'セルリアンブルー',     hex:'#2f86b9', gran:.75 },
+  { name:'フタロブルー',         hex:'#0d4a80', gran:0 },
+  { name:'ビリジャン',           hex:'#1e7a5e', gran:.35 },
+  { name:'サップグリーン',       hex:'#5b7a29', gran:.1 },
+  { name:'ペインズグレー',       hex:'#39434f', gran:.3 },
+  { name:'ローズマダー',         hex:'#b0305a', gran:.1 },
+  { name:'コバルトバイオレット', hex:'#7b4a9a', gran:.85 },
+  { name:'ネープルスイエロー',   hex:'#e9cf7a', gran:.2 },
+  { name:'インディゴ',           hex:'#263248', gran:.2 },
+  { name:'セピア',               hex:'#4a3527', gran:.4 },
+  { name:'墨',                   hex:'#141414', gran:.05 },
+
+  ] },
+  pop:{ label:'ポップ', colors:[
+    { name:'コーラル', hex:'#ff5a5f', gran:0.15 },
+    { name:'オレンジ', hex:'#ff9f1c', gran:0.15 },
+    { name:'レモン', hex:'#ffd93d', gran:0.15 },
+    { name:'ライム', hex:'#a0e426', gran:0.15 },
+    { name:'ミント', hex:'#06d6a0', gran:0.15 },
+    { name:'ターコイズ', hex:'#2ec4b6', gran:0.15 },
+    { name:'スカイ', hex:'#5ec8f2', gran:0.15 },
+    { name:'ブルー', hex:'#3a86ff', gran:0.15 },
+    { name:'グレープ', hex:'#8338ec', gran:0.15 },
+    { name:'ライラック', hex:'#c8a2e8', gran:0.15 },
+    { name:'ピンク', hex:'#ff006e', gran:0.15 },
+    { name:'バブルガム', hex:'#ffafcc', gran:0.15 },
+    { name:'マゼンタ', hex:'#f15bb5', gran:0.15 },
+    { name:'ピーチ', hex:'#ffc59e', gran:0.15 },
+    { name:'タンジェリン', hex:'#fb5607', gran:0.15 },
+    { name:'オーシャン', hex:'#118ab2', gran:0.15 },
+    { name:'ネイビー', hex:'#3d405b', gran:0.15 },
+    { name:'ブラック', hex:'#222222', gran:0.05 },
+  ] },
+  retro:{ label:'レトロ', colors:[
+    { name:'マスタード', hex:'#d9a441', gran:0.35 },
+    { name:'サンド', hex:'#e9cc96', gran:0.4 },
+    { name:'キャラメル', hex:'#c98a4b', gran:0.45 },
+    { name:'ラスト', hex:'#b5562b', gran:0.5 },
+    { name:'ブリック', hex:'#a8442f', gran:0.45 },
+    { name:'サーモン', hex:'#e07a5f', gran:0.25 },
+    { name:'ダスティローズ', hex:'#b56576', gran:0.3 },
+    { name:'ローズウッド', hex:'#8f5257', gran:0.4 },
+    { name:'プラム', hex:'#6d597a', gran:0.35 },
+    { name:'デニム', hex:'#355070', gran:0.4 },
+    { name:'スレート', hex:'#4f5d75', gran:0.35 },
+    { name:'セージ', hex:'#81b29a', gran:0.3 },
+    { name:'オリーブ', hex:'#7a8450', gran:0.45 },
+    { name:'モス', hex:'#5b6b3a', gran:0.4 },
+    { name:'フォレスト', hex:'#2f4b35', gran:0.35 },
+    { name:'ティール', hex:'#2a6f6f', gran:0.3 },
+    { name:'コーヒー', hex:'#4a3426', gran:0.5 },
+    { name:'チャコール', hex:'#33312e', gran:0.3 },
+  ] },
+  vivid:{ label:'ビビッド', colors:[
+    { name:'レッド', hex:'#ff1744', gran:0.1 },
+    { name:'バーミリオン', hex:'#ff3d00', gran:0.1 },
+    { name:'オレンジ', hex:'#ff9100', gran:0.1 },
+    { name:'イエロー', hex:'#ffea00', gran:0.05 },
+    { name:'レモンライム', hex:'#c6ff00', gran:0.05 },
+    { name:'グリーン', hex:'#00e676', gran:0.1 },
+    { name:'エメラルド', hex:'#00bfa5', gran:0.1 },
+    { name:'シアン', hex:'#00e5ff', gran:0.05 },
+    { name:'アジュール', hex:'#00b0ff', gran:0.1 },
+    { name:'ブルー', hex:'#2979ff', gran:0.1 },
+    { name:'ウルトラ', hex:'#304ffe', gran:0.15 },
+    { name:'バイオレット', hex:'#651fff', gran:0.1 },
+    { name:'パープル', hex:'#aa00ff', gran:0.1 },
+    { name:'フクシア', hex:'#d500f9', gran:0.1 },
+    { name:'ピンク', hex:'#f50057', gran:0.1 },
+    { name:'チョコ', hex:'#6d4c41', gran:0.3 },
+    { name:'グレー', hex:'#546e7a', gran:0.2 },
+    { name:'ブラック', hex:'#212121', gran:0.05 },
+  ] },
+  wa:{ label:'和の色', colors:[
+    { name:'紅', hex:'#d7003a', gran:0.1 },
+    { name:'茜', hex:'#b7282e', gran:0.2 },
+    { name:'朱', hex:'#eb6101', gran:0.25 },
+    { name:'弁柄', hex:'#8f2e14', gran:0.55 },
+    { name:'山吹', hex:'#f8b500', gran:0.1 },
+    { name:'黄土', hex:'#c39143', gran:0.55 },
+    { name:'鶯', hex:'#928c36', gran:0.4 },
+    { name:'萌黄', hex:'#aacf53', gran:0.15 },
+    { name:'若竹', hex:'#68be8d', gran:0.2 },
+    { name:'常盤', hex:'#007b43', gran:0.25 },
+    { name:'浅葱', hex:'#00a3af', gran:0.2 },
+    { name:'縹', hex:'#2792c3', gran:0.3 },
+    { name:'藍', hex:'#165e83', gran:0.45 },
+    { name:'紺', hex:'#223a70', gran:0.35 },
+    { name:'江戸紫', hex:'#745399', gran:0.3 },
+    { name:'撫子', hex:'#eebbcb', gran:0.1 },
+    { name:'利休鼠', hex:'#888e7e', gran:0.4 },
+    { name:'墨', hex:'#1c1c1c', gran:0.05 },
+  ] },
+};
+let PIGMENTS = COLOR_SETS.classic.colors.concat([WHITE_GOUACHE]);
+const GRADES = {
+  '2H':{ max:.5,  str:.09, soft:0 },  'HB':{ max:.95, str:.15, soft:.35 }, '2B':{ max:1.3, str:.21, soft:.55 },
+  '4B':{ max:1.75, str:.28, soft:.75 }, '6B':{ max:2.2, str:.36, soft:.95 }, '色':{ max:1.4, str:.2, soft:.5 },
+};
+const GRAPHITE = [1.0, .975, .92];
+const GOUACHE_WHITE = [.978, .975, .966];
+const ICONS = {
+  pencil:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M7 25 9 18 22 5l5 5-13 13z"/><path d="m9 18 5 5"/><path d="m7 25 1.6-.4L7.4 23.4z" fill="currentColor"/><path d="m19 8 5 5"/></svg>',
+  gpen:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M16 29 10 16l3-9h6l3 9z"/><path d="M16 29V19"/><circle cx="16" cy="16.5" r="1.6" fill="currentColor"/><path d="M12 3h8v4h-8z"/></svg>',
+  brush:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M21 3 15 13"/><path d="M14 11.5 18 14l-2 3"/><path d="M16 17c-2 6-6 9-11 10 1-5 3-9 9-12z" fill="currentColor" fill-opacity=".25"/></svg>',
+  sumi:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M16 3v12"/><path d="M12.5 13h7v3h-7z"/><path d="M13 16c-.5 5 1 9 3 13 2-4 3.5-8 3-13z" fill="currentColor"/></svg>',
+  water:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M16 4c4 6 8 10 8 15a8 8 0 0 1-16 0c0-5 4-9 8-15z"/><path d="M12 20a4 4 0 0 0 4 4" stroke-linecap="round"/></svg>',
+  tissue:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 12c2-4 6-1 8-4s6-2 7 1 6 0 6 4-3 4-2 7-3 6-6 4-5 3-8 1-6-1-6-4 3-5 1-9z"/><path d="M12 15c2 1 3 3 6 2" stroke-linecap="round"/></svg>',
+  eraser:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m5 20 12-12 10 10-8 8h-8z"/><path d="m11 14 10 10"/><path d="M5 27h22" stroke-linecap="round"/></svg>',
+  flat:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M14 3h4v10h-4z"/><path d="M11 13h10v4H11z"/><path d="M11 17h10l1 9H10z" fill="currentColor" fill-opacity=".25"/><path d="M13 20v5M16 20v6M19 20v5" stroke-width="1"/></svg>',
+  drop:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M13 3h6v6h-6z"/><path d="M14.5 9h3v4h-3z"/><path d="M16 15c1.6 2.4 3 4 3 6a3 3 0 0 1-6 0c0-2 1.4-3.6 3-6z" fill="currentColor"/><path d="M8 28c3-1.5 13-1.5 16 0" stroke-linecap="round"/></svg>',
+  gouache:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 9h14l-1.5 18h-11z"/><path d="M8 5h16v4H8z"/><path d="M12 15h8v6h-8z" fill="currentColor" fill-opacity=".35"/></svg>',
+};
+const WET = ['brush', 'flat', 'sumi', 'water', 'drop'];
+const TOOLS = {
+  pencil: { label:'鉛筆',     key:'p', target:'layer', size:4,  min:1, max:40,  hint:'筆圧で濃さ、ペンを寝かせると芯の腹で広く塗れます。紙の凹凸に粉が乗ります。' },
+  gpen:   { label:'Gペン',    key:'g', target:'layer', size:10, min:1, max:60,  hint:'弱い筆圧で細く、押すと太く。入り抜きのある線になります。' },
+  brush:  { label:'水彩筆',   key:'b', target:'sim',   size:46, min:3, max:240, conc:100, water:70, hint:'水と顔料を紙に置きます。乾く前に重ねると混ざってにじみ、縁には顔料がたまります。' },
+  flat:   { label:'平筆',     key:'f', target:'sim',   size:60, min:6, max:260, conc:100, water:70, angle:30, hint:'幅の広い平らな穂先。角度は固定なので、動かす向きで太い面にも細い線にもなります（回転を検知するペンなら回転に追従）。' },
+  sumi:   { label:'墨筆',     key:'s', target:'sim',   size:26, min:2, max:160, conc:170, water:50, hint:'穂先の細い筆。押すと太く。和紙を選ぶと繊維に沿ってにじみます。' },
+  water:  { label:'水筆',     key:'w', target:'sim',   size:56, min:3, max:280, water:80, hint:'水だけを置きます。濡れた色をのばしたり、半乾きの所に置くと「バックラン」ができます。' },
+  drop:   { label:'しずく',   key:'i', target:'sim',   size:36, min:4, max:120, conc:230, water:85, hint:'筆先から絵の具をぽたりと落とします。押している間は滴り続けます。水筆で濡らした所に落とすと、紙の繊維に沿って枝分かれしながら広がります。筋の強さは「にじみの筋」で変えられます。' },
+  gouache:{ label:'ガッシュ', key:'o', target:'both',  size:40, min:2, max:240, conc:80, angle:30, shape:'round', scratch:25, mix:15, hint:'不透明な絵の具。白で光を入れたり、暗い色の上に明るい色を重ねられます。「かすれ」で筆跡の擦れ、「混色」で下の絵の具と混ざる量を変えられます。' },
+  tissue: { label:'ティッシュ', key:'t', target:'sim', size:110, min:10, max:320, strength:70, hint:'濡れた絵の具を吸い取ります。雲や光の表現に。' },
+  eraser: { label:'消しゴム', key:'e', target:'both',  size:34, min:2, max:260, strength:80, hint:'選択中のレイヤーを消します。ペンの消しゴム側でも使えます。' },
+};
+
+/* ================= settings & state ================= */
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('nijimi:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v){ try { localStorage.setItem('nijimi:' + k, JSON.stringify(v)); } catch (e) {} },
+};
+const S = Object.assign({
+  tool:'brush', paper:'cold', colorSet:'classic', vein:140, bleed:100, drySpd:100, gran:100, curve:100, stab:2, penOnly:false, runout:true,
+  grade:'HB', pigment:6, custom:null,
+  tools:{},
+}, store.get('settings', {}));
+for (const k in TOOLS) S.tools[k] = Object.assign({ size:TOOLS[k].size, conc:TOOLS[k].conc, water:TOOLS[k].water, strength:TOOLS[k].strength, angle:TOOLS[k].angle, shape:TOOLS[k].shape, scratch:TOOLS[k].scratch, mix:TOOLS[k].mix }, S.tools[k] || {});
+if (!TOOLS[S.tool]) S.tool = 'brush';
+if (!PAPERS[S.paper]) S.paper = 'cold';
+if (!COLOR_SETS[S.colorSet]) S.colorSet = 'classic';
+PIGMENTS = COLOR_SETS[S.colorSet].colors.concat([WHITE_GOUACHE]);
+let saveT = 0; function saveSettings(){ clearTimeout(saveT); saveT = setTimeout(() => store.set('settings', S), 300); }
+
+function hexRgb(h){ const n = parseInt(h.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
+function absOf(rgb){ return rgb.map(c => -Math.log(Math.max(c, .012))); }
+function currentColor(){
+  if (S.custom) return { name: S.customName || '自分で作った色', hex:S.custom, gran: S.customGran != null ? S.customGran : .3, white: !!S.customWhite };
+  return PIGMENTS[S.pigment] || PIGMENTS[0];
+}
+
+let doc = { w:1600, h:1200 }, sim = { w:1600, h:1200 }, simQ = 1;
+let paperTex, paperFbo, paperSeed = Math.random() * 100;
+let layers = [], active = null, layerSeq = 1;
+const W = [], P = [], D = [], F = [], simFbo = [], fW = [], fP = [], fD = [], fF = [];
+let si = 0, fi = 0;
+let scratch, scratchF, backup, backupF;
+let simOwner = null, simHasContent = false, simSteps = 0, simBoost = 1, simTime = 0;
+let view = { x:0, y:0, z:1 }, dirty = true;
+let undoStack = [], redoStack = [], undoBytes = 0;
+const UNDO_BUDGET = (isCoarse ? 200 : 520) * 1024 * 1024;
+
+function simParams(){
+  const pp = PAPERS[S.paper]; const bleed = S.bleed / 100, dry = S.drySpd / 100;
+  return {
+    g:.14, damp:.9, slope:.05, openB: pp.openB / (.6 + .4 * bleed), openV: pp.openV / (.6 + .4 * bleed), fiberThr: pp.fiberThr,
+    evap: .00024 * dry * simBoost, edgeEvap: 6, absorb: pp.absorb, sCost: pp.sCost, capK: Math.min(.95, pp.capK * 4 * bleed),
+    delta: pp.delta / (.5 + .5 * bleed), sigB: pp.sigB / (.6 + .4 * bleed), sigV: pp.sigV / (.6 + .4 * bleed), evapS: .0009 * dry * simBoost,
+    vein: S.vein / 100, dep: .001, depDry: .1, desorb: .0012, pdiff: Math.min(.16, .1 * bleed), bloom: 3.5, granStr: S.gran / 100,
+  };
+}
+function simLod(){ return Math.max(0, Math.log2(1 / simQ)); }
+function dryStepsFull(){ const p = simParams(); return Math.ceil(1.3 / p.evap + 1 / p.evapS); }
+
+/* ================= document ================= */
+function freeDoc(){
+  for (const L of layers) freeTF(L.tex, L.fbo);
+  for (let i = 0; i < 2; i++) { [W, P, D, F].forEach(a => a[i] && gl.deleteTexture(a[i])); [simFbo, fW, fP, fD, fF].forEach(a => a[i] && gl.deleteFramebuffer(a[i])); }
+  freeTF(paperTex, paperFbo); freeTF(scratch, scratchF); freeTF(backup, backupF);
+  clearUndo();
+  layers = [];
+}
+function createDoc(w, h, q, seed){
+  freeDoc();
+  doc = { w, h }; simQ = q; sim = { w:Math.round(w * q), h:Math.round(h * q) };
+  paperTex = mkTex(w, h, 'u8mip'); paperFbo = mkFbo([paperTex]);
+  paperSeed = seed != null ? seed : Math.random() * 100; genPaper();
+  for (let i = 0; i < 2; i++) {
+    W[i] = mkTex(sim.w, sim.h); P[i] = mkTex(sim.w, sim.h); D[i] = mkTex(sim.w, sim.h); F[i] = mkTex(sim.w, sim.h);
+    simFbo[i] = mkFbo([W[i], P[i], D[i]]); fW[i] = mkFbo([W[i]]); fP[i] = mkFbo([P[i]]); fD[i] = mkFbo([D[i]]); fF[i] = mkFbo([F[i]]);
+    clearF(simFbo[i]); clearF(fF[i]);
+  }
+  si = 0; fi = 0; simOwner = null; simHasContent = false; simSteps = 0; simBoost = 1;
+  scratch = mkTex(w, h); scratchF = mkFbo([scratch]); backup = mkTex(w, h); backupF = mkFbo([backup]);
+  layerSeq = 1;
+  addLayer('水彩'); addLayer('線画');
+  active = layers[0];
+  renderLayers(); fitView(); updateUndoUI(); dirty = true;
+}
+function genPaper(){
+  const pp = PAPERS[S.paper];
+  gl.disable(gl.BLEND); target(paperFbo);
+  use(progs.paper, { u_seed:paperSeed, u_scale:pp.scale, u_bump:pp.bump, u_large:pp.large, u_fine:pp.fine, u_fiber:pp.fiber });
+  drawFull();
+  gl.bindTexture(gl.TEXTURE_2D, paperTex); gl.generateMipmap(gl.TEXTURE_2D);
+  dirty = true;
+}
+function addLayer(name){
+  if (layers.length >= 8) { toast('レイヤーは8枚までです'); return null; }
+  const tex = mkTex(doc.w, doc.h), fbo = mkFbo([tex]); clearF(fbo);
+  const L = { id:layerSeq, name: name || ('レイヤー ' + layerSeq), tex, fbo, visible:true, opacity:1 };
+  layerSeq++; layers.push(L); return L;
+}
+function deleteLayer(L){
+  if (layers.length <= 1) { toast('最後の1枚は削除できません'); return; }
+  const purge = st => st.filter(e => { const hit = e.parts.some(p => p.layer === L || p.owner === L); if (hit) freeEntry(e); return !hit; });
+  undoStack = purge(undoStack); redoStack = purge(redoStack);
+  if (simOwner === L) { clearSim(); simOwner = null; }
+  freeTF(L.tex, L.fbo);
+  layers = layers.filter(x => x !== L);
+  if (active === L) active = layers[layers.length - 1];
+  renderLayers(); updateUndoUI(); dirty = true;
+}
+
+/* ================= simulation ================= */
+function clearSim(){ for (let i = 0; i < 2; i++) { clearF(simFbo[i]); clearF(fF[i]); } simHasContent = false; simSteps = 0; simBoost = 1; tips.length = 0; }
+function simStep(){
+  const p = simParams(); simTime = (simTime + .618) % 97;
+  gl.disable(gl.BLEND);
+  target(fF[1 - fi]);
+  use(progs.flux, { u_W:W[si], u_F:F[fi], u_paper:paperTex, u_plod: simLod(), u_vein:p.vein, u_g:p.g, u_damp:p.damp, u_slope:p.slope, u_openB:p.openB, u_openV:p.openV, u_fiberThr:p.fiberThr, u_time:simTime });
+  drawFull(); fi = 1 - fi;
+  target(simFbo[1 - si]);
+  use(progs.update, { u_W:W[si], u_F:F[fi], u_P:P[si], u_D:D[si], u_paper:paperTex, u_plod: simLod(), u_vein:p.vein, u_fiberThr:p.fiberThr,
+    u_evap:p.evap, u_edgeEvap:p.edgeEvap, u_absorb:p.absorb, u_sCost:p.sCost, u_capK:p.capK, u_delta:p.delta, u_sigB:p.sigB, u_sigV:p.sigV, u_evapS:p.evapS,
+    u_dep:p.dep, u_depDry:p.depDry, u_desorb:p.desorb, u_pdiff:p.pdiff, u_granStr:p.granStr, u_bloom:p.bloom });
+  drawFull(); si = 1 - si;
+}
+function finalizeDry(){
+  gl.disable(gl.BLEND); target(simFbo[1 - si]);
+  use(progs.finalize, { u_P:P[si], u_D:D[si] }); drawFull(); si = 1 - si;
+  clearF(fF[0]); clearF(fF[1]); simSteps = 0; simBoost = 1; dirty = true; renderLayers();
+}
+function bakeSim(withUndo){
+  if (!simOwner || !simHasContent) return;
+  if (withUndo) pushUndo([snapLayer(simOwner, 0, 0, doc.w, doc.h), snapSim()]);
+  target(simOwner.fbo); gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE);
+  use(progs.bake, { u_P:P[si], u_D:D[si], u_paper:paperTex, u_doc:[doc.w, doc.h], u_granStr:S.gran / 100 });
+  drawFull(); gl.disable(gl.BLEND);
+  clearSim(); dirty = true;
+}
+let paperMaxH = 1, wetFull = 1;
+function wake(){ simSteps = dryStepsFull(); wetFull = simSteps; simBoost = 1; paperMaxH = 1; }
+/* every so often, look at how wet the paper really is so the simulation can stop early (saves battery) */
+const RED = 48; const redTex = mkTex(RED, RED); const redFbo = mkFbo([redTex]); const redBuf = new Float32Array(RED * RED * 4);
+function checkDryness(){
+  gl.disable(gl.BLEND); target(redFbo);
+  use(progs.reduce, { u_W:W[si], u_block:[Math.ceil(sim.w / RED), Math.ceil(sim.h / RED)] }); drawFull();
+  gl.readPixels(0, 0, RED, RED, gl.RGBA, gl.FLOAT, redBuf);
+  let mh = 0, ms = 0; for (let i = 0; i < redBuf.length; i += 4) { mh = Math.max(mh, redBuf[i]); ms = Math.max(ms, redBuf[i + 1]); }
+  paperMaxH = mh;
+  if (mh < 1e-4) { const p = simParams(); const left = Math.ceil(Math.max(0, ms - p.delta * .5) / p.evapS); if (left < 4) simSteps = 1; else simSteps = Math.min(simSteps, left); }
+}
+
+/* ================= undo ================= */
+function snapLayer(L, x, y, w, h, src){
+  const t = mkTex(w, h), f = mkFbo([t]); blit(src || L.fbo, f, x, y, w, h, 0, 0);
+  return { kind:'layer', layer:L, x, y, w, h, t, f, bytes:w * h * 8 };
+}
+function snapSim(){
+  const s = { kind:'sim', owner:simOwner, has:simHasContent, wet:simSteps > 0, tex:[], fbo:[], bytes:sim.w * sim.h * 24 };
+  [fW, fP, fD].forEach(arr => { const t = mkTex(sim.w, sim.h), f = mkFbo([t]); blit(arr[si], f, 0, 0, sim.w, sim.h, 0, 0); s.tex.push(t); s.fbo.push(f); });
+  return s;
+}
+function freePart(p){ if (p.kind === 'layer') freeTF(p.t, p.f); else p.tex.forEach((t, i) => freeTF(t, p.fbo[i])); }
+function freeEntry(e){ e.parts.forEach(freePart); undoBytes -= e.bytes; }
+function clearUndo(){ undoStack.forEach(freeEntry); redoStack.forEach(freeEntry); undoStack = []; redoStack = []; undoBytes = 0; }
+function pushUndo(parts){
+  const e = { parts, bytes: parts.reduce((a, p) => a + p.bytes, 0) };
+  redoStack.forEach(freeEntry); redoStack = [];
+  undoStack.push(e); undoBytes += e.bytes;
+  while (undoBytes > UNDO_BUDGET && undoStack.length > 1) freeEntry(undoStack.shift());
+  updateUndoUI();
+}
+function restorePart(p){
+  if (p.kind === 'layer') {
+    const cur = snapLayer(p.layer, p.x, p.y, p.w, p.h);
+    blit(p.f, p.layer.fbo, 0, 0, p.w, p.h, p.x, p.y); freePart(p); return cur;
+  }
+  const cur = snapSim();
+  [fW, fP, fD].forEach((arr, i) => blit(p.fbo[i], arr[si], 0, 0, sim.w, sim.h, 0, 0));
+  clearF(fF[0]); clearF(fF[1]);
+  simOwner = p.owner; simHasContent = p.has;
+  if (p.wet) wake(); else { simSteps = 0; }
+  freePart(p); return cur;
+}
+function swapEntry(from, to){
+  if (stroke) return;
+  tips.length = 0;
+  const e = from.pop(); if (!e) return;
+  undoBytes -= e.bytes;
+  const parts = e.parts.slice().reverse().map(restorePart).reverse();
+  const ne = { parts, bytes: parts.reduce((a, p) => a + p.bytes, 0) };
+  to.push(ne); undoBytes += ne.bytes;
+  dirty = true; updateUndoUI(); renderLayers();
+}
+const undo = () => swapEntry(undoStack, redoStack);
+const redo = () => swapEntry(redoStack, undoStack);
+function updateUndoUI(){ $('#undoBtn').disabled = !undoStack.length; $('#redoBtn').disabled = !redoStack.length; }
+
+/* ================= strokes ================= */
+let stroke = null;
+let dabQ = []; let qInfo = null;
+
+const isFlatTool = (tool, ts) => tool === 'flat' || (tool === 'gouache' && ts.shape === 'flat');
+function toolRadius(tool, p, ts){
+  const s = ts.size / 2;
+  if (isFlatTool(tool, ts)) return Math.max(3, s * (.85 + .15 * p));
+  switch (tool) {
+    case 'pencil': return Math.max(.6, s * (.75 + .25 * p));
+    case 'gpen':   return Math.max(.35, s * (.07 + .93 * Math.pow(p, 1.5)));
+    case 'brush':  return Math.max(1.5, s * (.22 + .78 * p));
+    case 'sumi':   return Math.max(1, s * (.05 + .95 * Math.pow(p, 1.35)));
+    case 'water':  return Math.max(1.5, s * (.3 + .7 * p));
+    case 'drop':   return Math.max(2, s * (.55 + .45 * p));
+    case 'gouache':return Math.max(1.5, s * (.3 + .7 * p));
+    default:       return Math.max(1, s * (.6 + .4 * p));
+  }
+}
+function toolSpacing(tool, r, ts){
+  if (ts && isFlatTool(tool, ts)) return Math.max(.6, r * .07);
+  switch (tool) {
+    case 'pencil': return Math.max(.4, r * .35);
+    case 'gpen':   return Math.max(.3, r * .18);
+    case 'brush': case 'water': return Math.max(.7, r * .18);
+    case 'sumi':   return Math.max(.4, r * .14);
+    case 'gouache':return Math.max(.6, r * .15);
+    case 'tissue': return Math.max(2, r * .3);
+    case 'drop':   return 1e9;
+    default:       return Math.max(.8, r * .2);
+  }
+}
+function streamInfo(tool){
+  const ts = S.tools[tool]; const col = currentColor();
+  return { tool, ts:{ ...ts }, abs: absOf(hexRgb(col.hex)), gran: col.gran, white: !!col.white, grade: S.grade, layer: active, seed: Math.random() * 100 };
+}
+function pushDab(x, y, r, p, bx, by, res, k){
+  dabQ.push(x, y, r, p, bx, by, res, k == null ? 1 : k);
+  if (stroke) { const b = stroke.bbox, m = r * 2.7 + 4; b[0] = Math.min(b[0], x - m); b[1] = Math.min(b[1], y - m); b[2] = Math.max(b[2], x + m); b[3] = Math.max(b[3], y + m); }
+}
+
+function beginStroke(e, pt){
+  flushDabs();
+  let tool = S.tool;
+  if (e.pointerType === 'pen' && (e.buttons & 32)) tool = 'eraser';
+  const T = TOOLS[tool];
+  const parts = [];
+  if (T.target === 'sim') {
+    if (simOwner && simOwner !== active && simHasContent) { const name = simOwner.name; bakeSim(true); toast(`「${name}」の濡れた絵の具を乾かして定着させました`); }
+    simOwner = active;
+    parts.push(snapSim());
+  }
+  // opaque marks (eraser, gouache, white ink / white pencil) also cover the wet wash on the same layer
+  const whiteMark = (tool === 'gpen' || (tool === 'pencil' && S.grade === '色')) && currentColor().white;
+  const coversSim = (T.target === 'both' || whiteMark) && simOwner === active && simHasContent;
+  if (coversSim) parts.push(snapSim());
+  const layerSnap = T.target !== 'sim';
+  if (layerSnap) blit(active.fbo, backupF, 0, 0, doc.w, doc.h, 0, 0);
+  qInfo = streamInfo(tool);
+  if (WET.includes(tool) && tool !== 'water' && S.vein > 0) readWetMap();
+  stroke = { pid:e.pointerId, ptype:e.pointerType, tool, parts, layerSnap, layer:active, seed:qInfo.seed,
+    bbox:[1e9, 1e9, -1e9, -1e9], last:pt, sm:{ x:pt.x, y:pt.y }, carry:0, res:1, dist:0, t0:performance.now(), lastDabT:performance.now(),
+    dir:[1, 0], pSm:pt.p, idle:0, eraseSim: coversSim };
+  emitDab(pt);
+  stroke.carry = toolSpacing(tool, toolRadius(tool, pt.p, qInfo.ts), qInfo.ts);
+  if (T.target !== 'layer') { simHasContent = T.target === 'sim' ? true : simHasContent; wake(); }
+  renderLayers();
+}
+function emitDab(pt, stationary){
+  const st = stroke, tool = st.tool, ts = qInfo.ts;
+  let p = pt.p;
+  if (tool === 'gpen' && st.ptype !== 'pen') p *= clamp(st.dist / 18, .15, 1);
+  const r = toolRadius(tool, p, ts);
+  const sp = toolSpacing(tool, r, ts);
+  let bx = st.dir[0], by = st.dir[1], k = 1;
+  if (tool === 'pencil') { bx = pt.tx; by = pt.ty; }
+  if (tool === 'drop') { bx = 0; by = 0; }
+  if (isFlatTool(tool, ts)) {
+    // the chisel edge keeps its angle in the hand; a pen that reports barrel rotation turns it
+    const a = ((ts.angle || 0) + (pt.tw || 0)) * Math.PI / 180;
+    const ex = Math.cos(a), ey = Math.sin(a);
+    bx = ex; by = ey;
+    const dl = Math.hypot(st.dir[0], st.dir[1]) || 1, dx = st.dir[0] / dl, dy = st.dir[1] / dl;
+    const t = r * (.15 + .13 * p);
+    const extent = 2 * (r * Math.abs(dx * ex + dy * ey) + t * Math.abs(-dx * ey + dy * ex));
+    k = stationary ? .5 : clamp(9.4 * sp / Math.max(extent, 2 * t), .05, 3);
+  }
+  if ((tool === 'brush' || tool === 'flat' || tool === 'sumi' || tool === 'gouache') && S.runout && !stationary) {
+    const load = tool === 'gouache' ? (ts.conc / 100) * .6 + .3 : (ts.water / 100);
+    const cap = (260 + 2600 * load * (tool === 'sumi' ? .8 : 1)) * (tool === 'flat' || isFlatTool(tool, ts) ? 2.2 : 1);
+    const scr = tool === 'gouache' ? 1 + 2.5 * ((ts.scratch != null ? ts.scratch : 25) / 100) : 1;
+    st.res = Math.max(.02, st.res - sp * (.3 + .7 * p) * Math.sqrt(r / 14) * scr / cap);
+  }
+  pushDab(pt.x, pt.y, r, stationary ? p * .55 : p, bx, by, st.res, k);
+  if (tool === 'drop') { readWetMap(); spawnTendrils(pt.x, pt.y, r, 0, Math.PI * 2, Math.round(7 + r / 3), 1); }
+  else if ((tool === 'brush' || tool === 'flat' || tool === 'sumi') && !stationary && S.vein > 0 && Math.random() < .07 * S.vein / 100 * (sp / Math.max(1, r * .18))) {
+    // wet-in-wet: now and then the new paint escapes sideways into the wet wash
+    const side = Math.random() < .5 ? 1 : -1, a0 = Math.atan2(st.dir[1], st.dir[0]) + side * Math.PI / 2;
+    spawnTendrils(pt.x + Math.cos(a0) * r * .8, pt.y + Math.sin(a0) * r * .8, r * .25, a0, .9, 1 + (Math.random() < .4 ? 1 : 0), .55);
+  }
+  st.lastDabT = performance.now();
+}
+function strokeTo(pt){
+  const st = stroke;
+  if (st.tool === 'drop') { st.last = pt; st.sm = pt; return; }
+  const a = st.sm;
+  const k = 1 / (1 + S.stab * .7);
+  const b = { x: a.x + (pt.x - a.x) * k, y: a.y + (pt.y - a.y) * k, p: pt.p, tx: pt.tx, ty: pt.ty };
+  segment(st.last, b);
+  st.sm = b;
+}
+function segment(a, b){
+  const st = stroke;
+  const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy);
+  if (L < 1e-3) { st.last = b; return; }
+  const nd = [dx / L, dy / L];
+  st.dir = [lerp(st.dir[0], nd[0], .5), lerp(st.dir[1], nd[1], .5)];
+  const base = st.distTotal || 0;
+  let d = st.carry;
+  while (d <= L) {
+    const t = d / L;
+    const q = { x: a.x + dx * t, y: a.y + dy * t, p: lerp(a.p, b.p, t), tx: lerp(a.tx, b.tx, t), ty: lerp(a.ty, b.ty, t) };
+    st.dist = base + d;
+    emitDab(q);
+    d += toolSpacing(st.tool, toolRadius(st.tool, q.p, qInfo.ts), qInfo.ts);
+  }
+  st.carry = d - L;
+  st.distTotal = base + L; st.dist = st.distTotal;
+  st.last = b;
+}
+function endStroke(){
+  const st = stroke; if (!st) return;
+  // let the smoothed point catch up with the pen
+  if (S.stab > 0) { const tgt = st.lastRaw || st.sm; for (let i = 0; i < 6; i++) strokeTo(tgt); }
+  flushDabs();
+  const parts = st.parts.slice();
+  if (st.layerSnap) {
+    const b = st.bbox;
+    const x0 = clamp(Math.floor(b[0]), 0, doc.w), y0 = clamp(Math.floor(b[1]), 0, doc.h);
+    const x1 = clamp(Math.ceil(b[2]), 0, doc.w), y1 = clamp(Math.ceil(b[3]), 0, doc.h);
+    if (x1 > x0 && y1 > y0) parts.push(snapLayer(st.layer, x0, y0, x1 - x0, y1 - y0, backupF));
+  }
+  stroke = null;
+  if (parts.length) pushUndo(parts);
+  renderLayers();
+}
+function cancelStroke(){
+  const st = stroke; if (!st) return;
+  dabQ = [];
+  if (st.layerSnap) blit(backupF, st.layer.fbo, 0, 0, doc.w, doc.h, 0, 0);
+  st.parts.slice().reverse().forEach(p => { const cur = restorePart(p); freePart(cur); });
+  stroke = null; dirty = true; renderLayers();
+}
+
+function coverSim(draw, aP, hard){
+  gl.blendEquation(gl.FUNC_ADD); target(simFbo[si]); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+  use(progs.simErase, { u_doc:[doc.w, doc.h], u_pad:0, u_paper:paperTex, u_aW:0, u_aP:aP, u_aD:aP, u_tissue:0, u_scratch:0, u_shape:0, u_hard:hard, u_plod: simLod(), u_seed:0 });
+  draw();
+}
+// copy the pixels a batch of dabs will touch, so a shader can read what is already on the layer
+function copyToScratch(data, layer){
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (let i = 0; i < data.length; i += 8) { const m = data[i + 2] * 3.7 + 3; x0 = Math.min(x0, data[i] - m); y0 = Math.min(y0, data[i + 1] - m); x1 = Math.max(x1, data[i] + m); y1 = Math.max(y1, data[i + 1] + m); }
+  x0 = clamp(Math.floor(x0), 0, doc.w); y0 = clamp(Math.floor(y0), 0, doc.h); x1 = clamp(Math.ceil(x1), 0, doc.w); y1 = clamp(Math.ceil(y1), 0, doc.h);
+  if (x1 > x0 && y1 > y0) blit(layer.fbo, scratchF, x0, y0, x1 - x0, y1 - y0, x0, y0);
+}
+function flushDabs(){
+  if (!dabQ.length || !qInfo) { dabQ = []; return false; }
+  const data = new Float32Array(dabQ); const n = data.length / 8; dabQ = [];
+  const I = qInfo, ts = I.ts, tool = I.tool;
+  gl.bindVertexArray(dabVAO); gl.bindBuffer(gl.ARRAY_BUFFER, dabBuf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STREAM_DRAW);
+  gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD);
+  const docU = [doc.w, doc.h];
+  const draw = () => { gl.bindVertexArray(dabVAO); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n); };
+  if (WET.includes(tool)) {
+    target(simFbo[si]); gl.blendFunc(gl.ONE, gl.ONE);
+    const sp = tool === 'sumi' ? .14 : .18;
+    const fk = tool === 'flat' ? 1.8 : 1;
+    const wa = fk * (tool === 'drop' ? (ts.water / 100) * .7 : (ts.water / 100) * (tool === 'water' ? .1 : tool === 'sumi' ? .075 : .09) * (sp / .18));
+    const pa = fk * (tool === 'water' ? 0 : tool === 'drop' ? (ts.conc / 100) * .55 : (ts.conc / 100) * (tool === 'sumi' ? .06 : .05) * (sp / .18));
+    const wshape = { u_shape: tool === 'flat' ? 1 : tool === 'drop' ? 2 : 0, u_hard: tool === 'sumi' ? .8 : tool === 'water' ? .7 : tool === 'flat' ? .86 : .78, u_plod: simLod(), u_seed:I.seed % 10 };
+    const whiteWash = I.white && tool !== 'water';
+    use(progs.brush, { u_doc:docU, u_pad:0, u_paper:paperTex, u_pig:I.abs, u_gran: tool === 'sumi' ? I.gran * .3 : I.gran,
+      u_wAmt:wa, u_pAmt: whiteWash ? 0 : pa, u_dFrac:0, ...wshape });
+    draw();
+    if (whiteWash) {
+      gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+      const k = Math.min(.5, (ts.conc / 100) * (tool === 'drop' ? .45 : .09) * fk);
+      use(progs.simErase, { u_doc:docU, u_pad:0, u_paper:paperTex, u_aW:0, u_aP:k, u_aD:k * .8, u_tissue:0, u_scratch:0, ...wshape }); draw();
+    }
+    simHasContent = true; wake();
+  } else if (tool === 'tissue') {
+    target(simFbo[si]); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+    const s = ts.strength / 100;
+    use(progs.simErase, { u_doc:docU, u_pad:0, u_paper:paperTex, u_aW:.4 * s, u_aP:.32 * s, u_aD:.05 * s, u_tissue:1, u_shape:0, u_hard:.55, u_plod: simLod(), u_seed:I.seed % 10 });
+    draw();
+  } else if (tool === 'eraser') {
+    const s = ts.strength / 100;
+    target(I.layer.fbo); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+    use(progs.layerErase, { u_doc:docU, u_pad:0, u_paper:paperTex, u_a:.2 * s }); draw();
+    if (stroke ? stroke.eraseSim : (simOwner === I.layer && simHasContent)) {
+      target(simFbo[si]);
+      use(progs.simErase, { u_doc:docU, u_pad:0, u_paper:paperTex, u_aW:0, u_aP:.2 * s, u_aD:.2 * s, u_tissue:0, u_shape:0, u_hard:.55, u_plod: simLod(), u_seed:0 }); draw();
+    }
+  } else if (tool === 'pencil') {
+    // copy current pixels of the touched area so the pencil can saturate like real graphite
+    copyToScratch(data, I.layer);
+    const G = GRADES[I.grade] || GRADES.HB;
+    let col = GRAPHITE;
+    const whitePencil = I.grade === '色' && I.white;
+    if (I.grade === '色') { const m = (I.abs[0] + I.abs[1] + I.abs[2]) / 3 || 1; col = whitePencil ? I.abs : I.abs.map(v => v / m * .8); }
+    target(I.layer.fbo);
+    if (whitePencil) gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA); else gl.blendFunc(gl.ONE, gl.ONE);
+    use(progs.pencil, { u_doc:docU, u_pad:2.6, u_paper:paperTex, u_cur:scratch, u_plod:0, u_col:col, u_maxD:G.max, u_str:G.str * 1.35, u_soft:G.soft, u_seed:I.seed % 10, u_opaque: whitePencil ? 1 : 0 });
+    draw();
+    if (whitePencil && stroke && stroke.eraseSim) coverSim(draw, .35, .6);
+  } else if (tool === 'gouache') {
+    const flat = ts.shape === 'flat';
+    const alpha = (ts.conc / 100) * .7;
+    const sc = (ts.scratch != null ? ts.scratch : 25) / 100, mx = (ts.mix != null ? ts.mix : 15) / 100;
+    const sh = { u_doc:docU, u_pad:0, u_paper:paperTex, u_shape: flat ? 1 : 0, u_hard:.82, u_seed:I.seed % 10, u_scratch: sc };
+    const simOn = simOwner === I.layer && simHasContent ? 1 : 0;
+    // mix with the wash as it was before this stroke, not with what the stroke has already covered
+    const preSim = stroke ? stroke.parts.find(pt => pt.kind === 'sim') : null;
+    target(I.layer.fbo); gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    use(progs.gouache, { ...sh, u_plod:0, u_col: I.abs.map(v => Math.min(4, v)), u_alpha: alpha, u_mix: mx, u_simOn: simOn, u_cur: mx > 0 && stroke && stroke.layerSnap ? backup : dummy, u_P: preSim ? preSim.tex[1] : P[si], u_D: preSim ? preSim.tex[2] : D[si] }); draw();
+    if (stroke ? stroke.eraseSim : (simOwner === I.layer && simHasContent)) {
+      // opaque paint hides the wet watercolour underneath it on the same layer
+      target(simFbo[si]); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+      use(progs.simErase, { ...sh, u_plod: simLod(), u_aW:0, u_aP: alpha, u_aD: alpha, u_tissue:2 }); draw();
+    }
+  } else if (tool === 'gpen') {
+    target(I.layer.fbo);
+    if (I.white) gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA); else gl.blendEquation(gl.MAX);
+    const ink = I.white ? I.abs : I.abs.map(v => Math.min(5, v * 1.35 + .05));
+    use(progs.pen, { u_doc:docU, u_pad:0, u_paper:paperTex, u_ink:ink, u_plod:0, u_opaque: I.white ? 1 : 0, u_rough: S.paper === 'hot' ? .25 : .5 });
+    draw();
+    if (I.white && stroke && stroke.eraseSim) coverSim(draw, .9, .9);
+  }
+  gl.blendEquation(gl.FUNC_ADD); gl.disable(gl.BLEND); gl.bindVertexArray(null);
+  dirty = true; return true;
+}
+
+/* ================= branching tendrils (ink feathering into wet paper) ================= */
+const tips = [];
+let wetMap = null;
+const MAXTIPS = 500;
+function readWetMap(){
+  const mw = Math.max(8, Math.round(sim.w / 2)), mh = Math.max(8, Math.round(sim.h / 2));
+  if (!wetMap || wetMap.w !== mw || wetMap.h !== mh) {
+    if (wetMap) freeTF(wetMap.t, wetMap.f);
+    const t = mkTex(mw, mh, 'u8'), f = mkFbo([t]);
+    wetMap = { w:mw, h:mh, t, f, data:new Uint8Array(mw * mh * 4) };
+  }
+  gl.disable(gl.BLEND); target(wetMap.f);
+  use(progs.wetmap, { u_W:W[si], u_size:[mw, mh] }); drawFull();
+  gl.readPixels(0, 0, mw, mh, gl.RGBA, gl.UNSIGNED_BYTE, wetMap.data);
+  target(null); wetMap.time = performance.now();
+}
+function wetAt(x, y){
+  if (!wetMap) return 0;
+  const mx = Math.floor(x / doc.w * wetMap.w), my = Math.floor(y / doc.h * wetMap.h);
+  if (mx < 0 || my < 0 || mx >= wetMap.w || my >= wetMap.h) return 0;
+  const i = (my * wetMap.w + mx) * 4, h = wetMap.data[i] / 255, s = wetMap.data[i + 1] / 255;
+  return h > .02 ? 1 : s > .55 ? .6 : 0;     // water film, or damp paper the ink can still creep into
+}
+function spawnTendrils(x, y, R, a0, spread, n, scale){
+  if (!qInfo || S.vein <= 0 || !wetAt(x, y)) return;
+  const v = S.vein / 100;
+  const I = qInfo, conc = (I.ts.conc || 100) / 100;
+  for (let i = 0; i < n && tips.length < MAXTIPS; i++) {
+    const a = spread >= 6 ? Math.random() * Math.PI * 2 : a0 + (Math.random() - .5) * spread;
+    const r0 = R * (.45 + Math.random() * .25);
+    tips.push({ x:x + Math.cos(a) * r0, y:y + Math.sin(a) * r0, a, w:(1.25 + R * .06) * (.7 + Math.random() * .6) * Math.sqrt(scale),
+      age:0, life:(R * 1.5 + 14) * (.6 + Math.random() * .8) * Math.min(2.2, .45 + .55 * v) * scale,
+      abs:I.abs, gran:I.gran, conc, wobble:(Math.random() - .5) * .08, gen:0, layer:simOwner });
+  }
+}
+function stepTendrils(){
+  if (!tips.length) return;
+  const v = S.vein / 100;
+  const out = [];
+  for (let i = tips.length - 1; i >= 0; i--) {
+    const t = tips[i];
+    if (t.layer !== simOwner) { tips.splice(i, 1); continue; }
+    const f = t.age / t.life;
+    const n = f < .3 ? 3 : f < .7 ? 2 : 1;           // fast at first, slowing like spreading ink
+    for (let k = 0; k < n; k++) {
+      t.a += t.wobble + (Math.random() - .5) * .32;
+      const step = .7 + .6 * (1 - f);
+      t.x += Math.cos(t.a) * step; t.y += Math.sin(t.a) * step; t.age += 1;
+      const wet = wetAt(t.x, t.y);
+      if (!wet || t.age > t.life) { t.dead = true; break; }
+      const g = 1 - t.age / t.life;
+      out.push({ t, x:t.x, y:t.y, r:Math.max(1, t.w * (.5 + .5 * g)), amt:t.conc * (.3 + .7 * g) * wet });
+      // split into two branches now and then
+      if (tips.length < MAXTIPS && Math.random() < (.022 + .014 * v) * (t.gen < 3 ? 1 : .35)) {
+        const da = (.35 + Math.random() * .55) * (Math.random() < .5 ? 1 : -1);
+        tips.push({ ...t, a:t.a + da, w:t.w * .78, life:t.age + (t.life - t.age) * (.55 + Math.random() * .35), gen:t.gen + 1, wobble:(Math.random() - .5) * .1 });
+        t.a -= da * .4; t.w *= .88;
+      }
+    }
+    if (t.dead) tips.splice(i, 1);
+  }
+  if (!out.length) return;
+  // draw, grouped by paint colour
+  const groups = new Map();
+  for (const d of out) { const key = d.t.abs.join(',') + '|' + d.t.gran; if (!groups.has(key)) groups.set(key, { abs:d.t.abs, gran:d.t.gran, list:[] }); groups.get(key).list.push(d); }
+  gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE);
+  target(simFbo[si]);
+  for (const gp of groups.values()) {
+    const data = new Float32Array(gp.list.length * 8);
+    gp.list.forEach((d, j) => { data.set([d.x, d.y, d.r, 1, Math.cos(d.t.a), Math.sin(d.t.a), 1, d.amt], j * 8); });
+    gl.bindVertexArray(dabVAO); gl.bindBuffer(gl.ARRAY_BUFFER, dabBuf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STREAM_DRAW);
+    use(progs.brush, { u_doc:[doc.w, doc.h], u_pad:0, u_paper:paperTex, u_pig:gp.abs, u_gran:gp.gran * .5,
+      u_wAmt:.01, u_pAmt:.17 * (.6 + .4 * v), u_dFrac: clamp(.35 + .2 * v, .35, .7), u_shape:0, u_hard:.2, u_plod: simLod(), u_seed: 3.3 });
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gp.list.length);
+  }
+  gl.disable(gl.BLEND); gl.bindVertexArray(null);
+  simHasContent = true; if (simSteps < 120) wake(); dirty = true;
+}
+
+/* ================= view ================= */
+const stage = $('#stage');
+let stageRect = stage.getBoundingClientRect();
+let DPR = 1;
+function resize(){
+  stageRect = stage.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.max(1, Math.round(stageRect.width * DPR)); canvas.height = Math.max(1, Math.round(stageRect.height * DPR));
+  dirty = true;
+}
+function fitView(){
+  resize();
+  let l = 24, r = 24, t = 24, b = 24;
+  if (!isNarrow()) { if (!$('#props').hidden) l = 260; if (!$('#layers').hidden || !$('#settings').hidden) r = 276; }
+  const aw = Math.max(50, stageRect.width - l - r), ah = Math.max(50, stageRect.height - t - b);
+  const z = Math.min(aw / doc.w, ah / doc.h);
+  view.z = z; view.x = l + (aw - doc.w * z) / 2; view.y = t + (ah - doc.h * z) / 2;
+  updateZoomUI(); dirty = true;
+}
+function zoomAt(cx, cy, f){
+  const z = clamp(view.z * f, .05, 16);
+  const dx = (cx - view.x) / view.z, dy = (cy - view.y) / view.z;
+  view.z = z; view.x = cx - dx * z; view.y = cy - dy * z; updateZoomUI(); dirty = true;
+}
+function updateZoomUI(){ $('#zoomBtn').textContent = Math.round(view.z * 100) + '%'; }
+let stageBg = [.77, .8, .83];
+function readStageBg(){
+  const c = getComputedStyle(stage).backgroundColor.match(/[\d.]+/g);
+  if (c) stageBg = [c[0] / 255, c[1] / 255, c[2] / 255];
+  dirty = true;
+}
+
+function composite(){
+  gl.disable(gl.BLEND); target(null);
+  const pp = PAPERS[S.paper];
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
+    u_doc:[doc.w, doc.h], u_canvas:[canvas.width, canvas.height], u_view:[view.x * DPR, view.y * DPR, view.z * DPR], u_export:0 };
+  const op = new Float32Array(8);
+  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = L && L.visible ? L.opacity : 0; }
+  U.u_op = op;
+  U.u_wetOp = simOwner ? (simOwner.visible ? simOwner.opacity : 0) : 1;
+  U.u_gouache = GOUACHE_WHITE; U.u_wetIdx = simOwner ? layers.indexOf(simOwner) : layers.indexOf(active);
+  use(progs.comp, U); drawFull();
+}
+
+/* ================= input ================= */
+const pointers = new Map();
+let gesture = null, panDrag = null, spaceDown = false, penSeen = false, lastSpeed = 0, lastEvt = null;
+const cursorEl = $('#cursor');
+
+function toDoc(cx, cy){ return { x:(cx - stageRect.left - view.x) / view.z, y:(cy - stageRect.top - view.y) / view.z }; }
+function readPoint(ev){
+  const d = toDoc(ev.clientX, ev.clientY);
+  let p;
+  if (ev.pointerType === 'pen') {
+    p = ev.pressure > 0 ? ev.pressure : .5;
+    p = Math.pow(clamp(p, .01, 1), S.curve / 100);
+  } else {
+    // mice and fingers have no pressure: estimate it from speed (slow = heavy, fast = light)
+    if (lastEvt && ev.timeStamp > lastEvt.t) {
+      const v = Math.hypot(ev.clientX - lastEvt.x, ev.clientY - lastEvt.y) / Math.max(1, ev.timeStamp - lastEvt.t);
+      lastSpeed = lerp(lastSpeed, v, .25);
+    }
+    p = clamp(.9 - lastSpeed * .28, .3, .9);
+  }
+  lastEvt = { x:ev.clientX, y:ev.clientY, t:ev.timeStamp };
+  let tx = (ev.tiltX || 0) / 90, ty = (ev.tiltY || 0) / 90;
+  if (!tx && !ty && ev.altitudeAngle != null && ev.altitudeAngle < Math.PI / 2 - .01) {
+    const m = 1 - ev.altitudeAngle / (Math.PI / 2); tx = Math.cos(ev.azimuthAngle) * m; ty = Math.sin(ev.azimuthAngle) * m;
+  }
+  const tl = Math.hypot(tx, ty);
+  const tiltAmt = clamp((tl - .35) / .5, 0, 1);
+  if (tl > 0) { tx = tx / tl * tiltAmt; ty = ty / tl * tiltAmt; }
+  if (stroke) { stroke.pSm = lerp(stroke.pSm, p, ev.pointerType === 'pen' ? .6 : .3); p = stroke.pSm; }
+  const tw = ev.pointerType === 'pen' && ev.twist ? ev.twist : 0;
+  return { x:d.x, y:d.y, p, tx, ty, tw };
+}
+function gestureBase(){
+  const pts = [...pointers.values()];
+  const c = pts.reduce((a, p) => ({ x:a.x + p.x / pts.length, y:a.y + p.y / pts.length }), { x:0, y:0 });
+  const d = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+  gesture = { c, d, v:{ ...view } };
+}
+function gestureMove(){
+  const pts = [...pointers.values()]; if (!pts.length || !gesture) return;
+  const c = pts.reduce((a, p) => ({ x:a.x + p.x / pts.length, y:a.y + p.y / pts.length }), { x:0, y:0 });
+  const d = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+  const g = gesture, v0 = g.v;
+  const z = (g.d > 0 && d > 0) ? clamp(v0.z * d / g.d, .05, 16) : v0.z;
+  const lx = c.x - stageRect.left, ly = c.y - stageRect.top, gx = g.c.x - stageRect.left, gy = g.c.y - stageRect.top;
+  const dx = (gx - v0.x) / v0.z, dy = (gy - v0.y) / v0.z;
+  view.z = z; view.x = lx - dx * z; view.y = ly - dy * z; updateZoomUI(); dirty = true;
+}
+function showCursor(ev){
+  if (ev.pointerType === 'touch' || panDrag || spaceDown || handMode) { cursorEl.style.display = 'none'; return; }
+  const tool = (ev.pointerType === 'pen' && (ev.buttons & 32)) ? 'eraser' : S.tool;
+  const r = Math.max(1.5, (S.tools[tool].size / 2) * view.z * (tool === 'gpen' ? .6 : 1));
+  const x = ev.clientX - stageRect.left, y = ev.clientY - stageRect.top;
+  cursorEl.style.display = 'block';
+  cursorEl.style.width = cursorEl.style.height = (r * 2) + 'px';
+  cursorEl.style.transform = `translate(${x - r - 1}px, ${y - r - 1}px)`;
+}
+
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  if (e.pointerType === 'pen' && !penSeen) {
+    penSeen = true;
+    if (!S.penOnly && isCoarse) { S.penOnly = true; $('#penOnly').checked = true; saveSettings(); toast('ペンを検出しました。指はスクロールと拡大に使います（設定で変更できます）'); }
+  }
+  if (!isNarrow() && !$('#settings').hidden) { /* keep */ }
+  if (e.pointerType === 'touch') {
+    pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    if (pointers.size >= 2) {
+      if (stroke && stroke.ptype === 'touch') { if (performance.now() - stroke.t0 < 350 || (stroke.distTotal || 0) < 30 / view.z) cancelStroke(); else endStroke(); }
+      gestureBase(); return;
+    }
+    if (S.penOnly) { gestureBase(); return; }
+  }
+  // pan: hand tool, space, wheel button, right button, or the pen's side button
+  if (e.button === 1 || (e.pointerType === 'mouse' && (spaceDown || e.button === 2)) || ((handMode || spaceDown) && e.pointerType !== 'touch') || (e.pointerType === 'pen' && (e.buttons & 2))) {
+    canvas.classList.add('grabbing');
+    panDrag = { x:e.clientX, y:e.clientY, vx:view.x, vy:view.y, id:e.pointerId }; cursorEl.style.display = 'none'; return;
+  }
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (stroke) return;
+  lastEvt = null; lastSpeed = 0;
+  const pt = readPoint(e);
+  if (e.pointerType !== 'pen') pt.p = .75;
+  beginStroke(e, pt);
+  if (stroke) stroke.pSm = pt.p;
+});
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType === 'touch' && pointers.has(e.pointerId)) {
+    pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    if (gesture) { gestureMove(); return; }
+  }
+  if (panDrag && e.pointerId === panDrag.id) { view.x = panDrag.vx + e.clientX - panDrag.x; view.y = panDrag.vy + e.clientY - panDrag.y; dirty = true; return; }
+  showCursor(e);
+  if (stroke && e.pointerId === stroke.pid) {
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+    for (const ev of (evs.length ? evs : [e])) { const pt = readPoint(ev); stroke.lastRaw = pt; strokeTo(pt); }
+    stroke.lastMoveT = performance.now(); stroke.idle = 0;
+  }
+});
+function pointerEnd(e){
+  if (e.pointerType === 'touch') {
+    pointers.delete(e.pointerId);
+    if (gesture) { if (pointers.size) gestureBase(); else gesture = null; }
+  }
+  if (panDrag && e.pointerId === panDrag.id) { panDrag = null; canvas.classList.remove('grabbing'); }
+  if (stroke && e.pointerId === stroke.pid) endStroke();
+}
+canvas.addEventListener('pointerup', pointerEnd);
+canvas.addEventListener('pointercancel', e => { if (stroke && e.pointerId === stroke.pid && e.pointerType === 'touch') { pointers.delete(e.pointerId); endStroke(); return; } pointerEnd(e); });
+canvas.addEventListener('pointerleave', e => { if (!stroke) cursorEl.style.display = 'none'; });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const x = e.clientX - stageRect.left, y = e.clientY - stageRect.top;
+  // ctrl+wheel / trackpad pinch / notched mouse wheel → zoom; two-finger trackpad scroll → pan
+  const notched = e.deltaMode === 1 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 50 && Number.isInteger(e.deltaY));
+  if (e.ctrlKey || e.metaKey || notched) {
+    const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+    zoomAt(x, y, Math.exp(-dy * (e.ctrlKey ? .01 : .0015)));
+  } else { view.x -= e.deltaX; view.y -= e.deltaY; dirty = true; }
+}, { passive:false });
+['gesturestart', 'gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+
+window.addEventListener('keydown', e => {
+  if (e.target.matches('input,select,textarea')) return;
+  const k = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (k === ' ') { spaceDown = true; canvas.style.cursor = 'grab'; e.preventDefault(); return; }
+  if (k === '[' || k === ']') { const ts = S.tools[S.tool], T = TOOLS[S.tool]; ts.size = clamp(Math.round(ts.size * (k === ']' ? 1.15 : 1 / 1.15) + (k === ']' ? 1 : -1) * .5), T.min, T.max); syncProps(); saveSettings(); return; }
+  if (k === '0') { fitView(); return; }
+  if (k === 'h') { setHand(!handMode); return; }
+  if (k === '+' || k === '=' || k === ';') { zoomStep(1.25); return; }
+  if (k === '-') { zoomStep(.8); return; }
+  if (k === 'd') { dryNow(); return; }
+  for (const t in TOOLS) if (TOOLS[t].key === k) { selectTool(t); return; }
+});
+window.addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; canvas.style.cursor = ''; } });
+
+/* ================= loop ================= */
+function frame(){
+  requestAnimationFrame(frame);
+  if (stroke && stroke.tool === 'drop' && performance.now() - stroke.lastDabT > 380) emitDab({ x:stroke.last.x, y:stroke.last.y, p:stroke.pSm, tx:0, ty:0 });
+  else if (stroke && TOOLS[stroke.tool].target === 'sim' && stroke.tool !== 'tissue' && stroke.tool !== 'drop' && ++stroke.idle >= 4 && performance.now() - stroke.lastDabT > 70 && performance.now() - (stroke.lastMoveT || 0) > 90) {
+    emitDab({ x:stroke.last.x, y:stroke.last.y, p:stroke.pSm, tx:0, ty:0 }, true);
+  }
+  flushDabs();
+  stepTendrils();
+  if (simSteps > 0) {
+    const n = 2;
+    for (let i = 0; i < n; i++) simStep();
+    simSteps -= n;
+    if (!stroke && ++frameN % 45 === 0 && simSteps > 0) checkDryness();
+    if (simSteps <= 0) finalizeDry();
+    dirty = true; updateWetUI();
+  }
+  if (++uiTick % 6 === 0 || simSteps <= 0) updateWetUI();
+  if (dirty) { composite(); dirty = false; }
+}
+let wetShown = null, frameN = 0, uiTick = 0;
+let coachQueued = false;
+function updateWetUI(force){
+  if (simSteps > 0 && !stroke && !coachQueued && !tipShown('meter')) {
+    coachQueued = true;
+    setTimeout(() => showCoach($('#dryBtn'), 'meter', '紙の濡れ具合メーター',
+      'ボタンの中の水の高さが、紙がどれだけ濡れているかです。<em>濃い青</em>は水が乗っている状態、<em>薄い青</em>は「半乾き」。半乾きのときに水や絵の具を置くと、にじみやバックランが出やすくなります。押すとドライヤーで一気に乾かせます。'), 500);
+  }
+  // states: 'wet' = water standing on the paper, 'damp' = soaked in (blooms happen here), 'dry'
+  const state = simSteps <= 0 ? 'dry' : (paperMaxH < 1e-4 ? 'damp' : 'wet');
+  const pct = state === 'dry' ? 0 : Math.round(clamp(simSteps / Math.max(1, wetFull), 0, 1) * 100);
+  if (!force && state === wetShown && Math.abs(pct - (updateWetUI.pct || 0)) < 2) return;
+  updateWetUI.pct = pct;
+  const b = $('#dryBtn');
+  $('#wetFill').style.height = (state === 'dry' ? 0 : Math.max(10, pct)) + '%';
+  if (state !== wetShown) {
+    b.classList.toggle('wet', state === 'wet'); b.classList.toggle('damp', state === 'damp');
+    $('#wetText').textContent = { wet:'濡れています', damp:'しっとり', dry:'乾いています' }[state];
+    $('#wetShort').textContent = { wet:'濡れ', damp:'半乾き', dry:'乾燥' }[state];
+    wetShown = state;
+  }
+  const label = { wet:`濡れています（水 ${pct}%）`, damp:`しっとり（半乾き・あと少しで乾きます）`, dry:'乾いています' }[state];
+  b.title = `${label}　押すとドライヤーで乾かします (D)`; b.setAttribute('aria-label', `乾かす：${label}`);
+}
+function dryNow(){
+  if (simSteps <= 0) { toast('紙はもう乾いています'); return; }
+  simBoost = 9; simSteps = Math.min(simSteps, Math.ceil(dryStepsFull() * 1.05));
+  toast('ドライヤーで乾かしています…');
+}
+
+/* ================= UI ================= */
+let toastT = 0;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function buildTools(){
+  const nav = $('#tools');
+  for (const t in TOOLS) {
+    const b = document.createElement('button');
+    b.className = 'tool'; b.dataset.tool = t; b.title = `${TOOLS[t].label}（${TOOLS[t].key.toUpperCase()}）`;
+    b.innerHTML = ICONS[t] + `<span>${TOOLS[t].label}</span>`;
+    b.addEventListener('click', () => {
+      if (S.tool === t && isNarrow()) { togglePanel('props'); return; }
+      selectTool(t);
+    });
+    nav.appendChild(b);
+  }
+}
+function selectTool(t){ S.tool = t; setHand(false); saveSettings(); syncProps(); }
+let handMode = false;
+function setHand(on){ handMode = on; $('#handBtn').setAttribute('aria-pressed', String(on)); canvas.classList.toggle('hand', on); if (on) cursorEl.style.display = 'none'; }
+function zoomStep(f){ zoomAt(stageRect.width / 2, stageRect.height / 2, f); }
+function syncProps(){
+  const t = S.tool, T = TOOLS[t], ts = S.tools[t];
+  $$('.tool').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === t));
+  $('#toolTitle').textContent = T.label; $('#toolHint').textContent = T.hint;
+  const keys = [t]; if (t === 'gouache' && ts.shape === 'flat') keys.push('gouache-flat');
+  $$('#props [data-show]').forEach(el => { el.hidden = !el.dataset.show.split(' ').some(k => keys.includes(k)); });
+  const sz = $('#size'); sz.min = T.min; sz.max = T.max; sz.value = ts.size; $('#sizeV').textContent = ts.size;
+  $('#concL').textContent = t === 'gouache' ? '不透明度' : t === 'drop' ? '濃さ' : '絵の具';
+  if (ts.conc != null) { $('#conc').value = ts.conc; $('#concV').textContent = ts.conc + '%'; }
+  if (ts.water != null) { $('#water').value = ts.water; $('#waterV').textContent = ts.water + '%'; }
+  if (ts.strength != null) { $('#strength').value = ts.strength; $('#strengthV').textContent = ts.strength + '%'; }
+  if (ts.angle != null) { $('#angle').value = ts.angle; $('#angleV').textContent = ts.angle + '°'; }
+  if (ts.scratch != null) { $('#scratch').value = ts.scratch; $('#scratchV').textContent = ts.scratch + '%'; }
+  if (ts.mix != null) { $('#gmix').value = ts.mix; $('#gmixV').textContent = ts.mix + '%'; }
+  $('#drySpd2').value = S.drySpd; $('#drySpd2V').textContent = S.drySpd + '%';
+  $('#vein2').value = S.vein; $('#vein2V').textContent = S.vein + '%';
+  $$('#shapeSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === (ts.shape || 'round')));
+  $$('#gradeSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.g === S.grade));
+  const col = currentColor();
+  $('#swCur').style.background = col.hex; $('#colorName').textContent = col.name;
+  $('#colorMeta').textContent = (col.white ? '白（水彩では色を淡くします）' : '粒状性 ' + (col.gran > .6 ? '強' : col.gran > .25 ? '中' : '弱')) + ' · ' + col.hex.toUpperCase();
+  $('#colorPick').value = col.hex;
+  const usesColor = ['gpen', 'brush', 'flat', 'sumi', 'drop', 'gouache'].includes(t) || (t === 'pencil' && S.grade === '色');
+  $('#chipDot').style.background = col.hex; $('#chipName').textContent = col.name;
+  $('#colorChip').classList.toggle('muted', !usesColor);
+  $('#colorChip').title = usesColor ? `色とパレット（${col.name}）` : `色とパレット（${T.label}は色を使いません）`;
+  const note = $('#colorNote');
+  note.hidden = usesColor;
+  note.textContent = t === 'pencil' ? '鉛筆で色を使うには、芯の硬さで「色」を選んでください。' : `${T.label}は色を使いません。色は筆・ペン・しずく・ガッシュで使えます。`;
+  $$('.sw').forEach(b => b.setAttribute('aria-pressed', !S.custom && +b.dataset.i === S.pigment));
+  $$('#palSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === palMode));
+  $$('#setChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === S.colorSet));
+}
+function bindRange(id, get, set, fmt){
+  const el = $('#' + id), out = $('#' + id + 'V');
+  el.value = get(); if (out) out.textContent = fmt(get());
+  el.addEventListener('input', () => { set(+el.value); if (out) out.textContent = fmt(+el.value); saveSettings(); });
+}
+function buildProps(){
+  const ts = () => S.tools[S.tool];
+  $('#size').addEventListener('input', e => { ts().size = +e.target.value; $('#sizeV').textContent = ts().size; saveSettings(); });
+  $('#conc').addEventListener('input', e => { ts().conc = +e.target.value; $('#concV').textContent = ts().conc + '%'; saveSettings(); });
+  $('#water').addEventListener('input', e => { ts().water = +e.target.value; $('#waterV').textContent = ts().water + '%'; saveSettings(); });
+  $('#strength').addEventListener('input', e => { ts().strength = +e.target.value; $('#strengthV').textContent = ts().strength + '%'; saveSettings(); });
+  $('#angle').addEventListener('input', e => { ts().angle = +e.target.value; $('#angleV').textContent = ts().angle + '°'; saveSettings(); });
+  $('#scratch').addEventListener('input', e => { ts().scratch = +e.target.value; $('#scratchV').textContent = ts().scratch + '%'; saveSettings(); });
+  $('#gmix').addEventListener('input', e => { ts().mix = +e.target.value; $('#gmixV').textContent = ts().mix + '%'; saveSettings(); });
+  $('#drySpd2').addEventListener('input', e => { setDrySpeed(+e.target.value); });
+  $('#vein2').addEventListener('input', e => { setVein(+e.target.value); });
+  $$('#shapeSeg button').forEach(b => b.addEventListener('click', () => { ts().shape = b.dataset.s; saveSettings(); syncProps(); }));
+  const gs = $('#gradeSeg');
+  for (const g in GRADES) { const b = document.createElement('button'); b.textContent = g; b.dataset.g = g; b.addEventListener('click', () => { S.grade = g; saveSettings(); syncProps(); }); gs.appendChild(b); }
+  buildSwatches();
+  const sc = $('#setChips');
+  for (const k in COLOR_SETS) {
+    const set = COLOR_SETS[k], b = document.createElement('button'); b.dataset.k = k;
+    const pick = [0, 4, 7, 11].map(i => set.colors[Math.min(i, set.colors.length - 1)].hex);
+    b.innerHTML = `<i>${pick.map(h => `<b style="background:${h}"></b>`).join('')}</i>${set.label}`;
+    b.addEventListener('click', () => { S.colorSet = k; PIGMENTS = set.colors.concat([WHITE_GOUACHE]); if (!S.custom) S.pigment = 0; saveSettings(); buildSwatches(); syncProps(); });
+    sc.appendChild(b);
+  }
+  $('#colorPick').addEventListener('input', e => { S.custom = e.target.value; S.customName = null; S.customGran = .3; S.customWhite = false; saveSettings(); syncProps(); });
+  buildPalette();
+}
+function buildSwatches(){
+  const sw = $('#swatches'); sw.innerHTML = '';
+  PIGMENTS.forEach((pg, i) => {
+    const b = document.createElement('button'); b.className = 'sw'; b.dataset.i = i; b.style.background = pg.hex; b.title = pg.name; b.setAttribute('aria-label', pg.name);
+    b.addEventListener('click', () => { S.pigment = i; S.custom = null; saveSettings(); syncProps(); });
+    sw.appendChild(b);
+  });
+}
+function setVein(v){
+  S.vein = v; ['vein', 'vein2'].forEach(id => { $('#' + id).value = v; $('#' + id + 'V').textContent = v + '%'; }); saveSettings();
+}
+function setDrySpeed(v){
+  S.drySpd = v; if (simSteps > 0) simSteps = Math.min(simSteps, dryStepsFull());
+  $('#drySpd').value = v; $('#drySpdV').textContent = v + '%'; $('#drySpd2').value = v; $('#drySpd2V').textContent = v + '%';
+  saveSettings();
+}
+
+/* ================= mixing palette ================= */
+// each cell holds paint as extensive amounts: m (paint), m·absorbance (rgb), m·white, m·granulation
+const PW = 120, PH = 80, PN = PW * PH;
+const pal = { M:new Float32Array(PN), A:new Float32Array(PN * 3), Wh:new Float32Array(PN), G:new Float32Array(PN) };
+let palMode = 'put', palDrag = null, palSaveT = 0;
+const palCanvas = $('#palette'); const palCtx = palCanvas.getContext('2d');
+const palImg = document.createElement('canvas'); palImg.width = PW; palImg.height = PH; const palImgCtx = palImg.getContext('2d');
+const palData = palImgCtx.createImageData(PW, PH);
+function paintColor(i){
+  const m = pal.M[i]; if (m < 1e-4) return null;
+  const w = pal.Wh[i] / m, f = (1 - w) / (1 + 4 * w);
+  return [0, 1, 2].map(c => Math.exp(-pal.A[i * 3 + c] / m * f) * (1 - .025 * w));
+}
+function renderPalette(){
+  const d = palData.data;
+  for (let y = 0; y < PH; y++) for (let x = 0; x < PW; x++) {
+    const i = y * PW + x, m = pal.M[i];
+    let r = .955, g = .955, b = .945;
+    if (m > 1e-4) {
+      const c = paintColor(i), cov = 1 - Math.exp(-m * 2.4);
+      r = lerp(r, c[0], cov); g = lerp(g, c[1], cov); b = lerp(b, c[2], cov);
+      // wet paint sheen from the thickness gradient
+      const mx = pal.M[y * PW + Math.min(PW - 1, x + 1)] - pal.M[y * PW + Math.max(0, x - 1)];
+      const my = pal.M[Math.min(PH - 1, y + 1) * PW + x] - pal.M[Math.max(0, y - 1) * PW + x];
+      const sh = clamp((-mx - my) * .9, -.25, .35);
+      r = clamp(r + sh * .5, 0, 1); g = clamp(g + sh * .5, 0, 1); b = clamp(b + sh * .5, 0, 1);
+    }
+    d[i * 4] = r * 255; d[i * 4 + 1] = g * 255; d[i * 4 + 2] = b * 255; d[i * 4 + 3] = 255;
+  }
+  palImgCtx.putImageData(palData, 0, 0);
+  const W = palCanvas.width, H = palCanvas.height;
+  palCtx.imageSmoothingEnabled = true; palCtx.imageSmoothingQuality = 'high';
+  palCtx.drawImage(palImg, 0, 0, W, H);
+}
+function sizePalette(){
+  const r = palCanvas.getBoundingClientRect(); if (!r.width) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  palCanvas.width = Math.round(r.width * dpr); palCanvas.height = Math.round(r.width * 2 / 3 * dpr);
+  renderPalette();
+}
+function palCell(e){ const r = palCanvas.getBoundingClientRect(); return { x:(e.clientX - r.left) / r.width * PW, y:(e.clientY - r.top) / r.height * PH }; }
+function palForEach(cx, cy, R, fn){
+  for (let y = Math.max(0, Math.floor(cy - R)); y <= Math.min(PH - 1, Math.ceil(cy + R)); y++)
+    for (let x = Math.max(0, Math.floor(cx - R)); x <= Math.min(PW - 1, Math.ceil(cx + R)); x++) {
+      const d2 = ((x + .5 - cx) ** 2 + (y + .5 - cy) ** 2) / (R * R); if (d2 < 1) fn(y * PW + x, 1 - d2);
+    }
+}
+function palPut(cx, cy){
+  const col = currentColor(), ab = absOf(hexRgb(col.hex)), wh = col.white ? 1 : 0;
+  palForEach(cx, cy, 6.5, (i, f) => {
+    const a = .22 * f;
+    pal.M[i] += a; for (let c = 0; c < 3; c++) pal.A[i * 3 + c] += a * ab[c]; pal.Wh[i] += a * wh; pal.G[i] += a * col.gran;
+    const m = pal.M[i]; if (m > 2.5) { const k = 2.5 / m; pal.M[i] *= k; for (let c = 0; c < 3; c++) pal.A[i * 3 + c] *= k; pal.Wh[i] *= k; pal.G[i] *= k; }
+  });
+}
+function palMix(cx, cy, B){
+  // brush and palette exchange paint, so colours smear and blend subtractively
+  let sw = 0; const acc = [0, 0, 0, 0, 0, 0];
+  palForEach(cx, cy, 6, (i, f) => {
+    const k = .3 * f;
+    const cell = [pal.M[i], pal.A[i * 3], pal.A[i * 3 + 1], pal.A[i * 3 + 2], pal.Wh[i], pal.G[i]];
+    for (let c = 0; c < 6; c++) acc[c] += f * cell[c];
+    sw += f;
+    pal.M[i] += k * (B[0] - cell[0]); pal.A[i * 3] += k * (B[1] - cell[1]); pal.A[i * 3 + 1] += k * (B[2] - cell[2]); pal.A[i * 3 + 2] += k * (B[3] - cell[3]);
+    pal.Wh[i] += k * (B[4] - cell[4]); pal.G[i] += k * (B[5] - cell[5]);
+  });
+  if (sw > 0) for (let c = 0; c < 6; c++) B[c] += .35 * (acc[c] / sw - B[c]);
+}
+function palSample(cx, cy, R){
+  const acc = [0, 0, 0, 0, 0, 0]; let sw = 0;
+  palForEach(cx, cy, R, (i, f) => { acc[0] += f * pal.M[i]; acc[1] += f * pal.A[i * 3]; acc[2] += f * pal.A[i * 3 + 1]; acc[3] += f * pal.A[i * 3 + 2]; acc[4] += f * pal.Wh[i]; acc[5] += f * pal.G[i]; sw += f; });
+  return sw ? acc.map(v => v / sw) : acc;
+}
+function palPick(cx, cy){
+  const B = palSample(cx, cy, 2.5);
+  if (B[0] < .03) { toast('そこには絵の具がありません'); return; }
+  const w = B[4] / B[0], f = (1 - w) / (1 + 4 * w);
+  const rgb = [1, 2, 3].map(c => Math.exp(-B[c] / B[0] * f) * (1 - .025 * w));
+  const hex = '#' + rgb.map(v => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, '0')).join('');
+  S.custom = hex; S.customName = 'パレットで混ぜた色'; S.customGran = B[5] / B[0]; S.customWhite = w > .55;
+  saveSettings(); syncProps();
+  toast('パレットの色を筆に取りました');
+}
+function palSave(){
+  clearTimeout(palSaveT);
+  palSaveT = setTimeout(() => {
+    const q = new Uint8Array(PN * 6);
+    for (let i = 0; i < PN; i++) {
+      const m = pal.M[i]; q[i * 6] = Math.round(clamp(m / 2.5, 0, 1) * 255);
+      if (m > 1e-4) { for (let c = 0; c < 3; c++) q[i * 6 + 1 + c] = Math.round(clamp(pal.A[i * 3 + c] / m / 4.5, 0, 1) * 255); q[i * 6 + 4] = Math.round(clamp(pal.Wh[i] / m, 0, 1) * 255); q[i * 6 + 5] = Math.round(clamp(pal.G[i] / m, 0, 1) * 255); }
+    }
+    let bin = ''; for (let i = 0; i < q.length; i += 8192) bin += String.fromCharCode.apply(null, q.subarray(i, i + 8192));
+    store.set('palette', btoa(bin));
+  }, 600);
+}
+function palLoad(){
+  const b64 = store.get('palette', null); if (!b64) return;
+  try {
+    const bin = atob(b64); if (bin.length !== PN * 6) return;
+    for (let i = 0; i < PN; i++) {
+      const m = bin.charCodeAt(i * 6) / 255 * 2.5; pal.M[i] = m;
+      for (let c = 0; c < 3; c++) pal.A[i * 3 + c] = bin.charCodeAt(i * 6 + 1 + c) / 255 * 4.5 * m;
+      pal.Wh[i] = bin.charCodeAt(i * 6 + 4) / 255 * m; pal.G[i] = bin.charCodeAt(i * 6 + 5) / 255 * m;
+    }
+  } catch (e) {}
+}
+function buildPalette(){
+  palLoad();
+  $$('#palSeg button').forEach(b => b.addEventListener('click', () => { palMode = b.dataset.m; syncProps(); }));
+  let armed = 0;
+  $('#palWash').addEventListener('click', () => {
+    const b = $('#palWash');
+    if (!armed) { b.textContent = '本当に洗う'; armed = setTimeout(() => { armed = 0; b.textContent = '洗う'; }, 3000); return; }
+    clearTimeout(armed); armed = 0; b.textContent = '洗う';
+    pal.M.fill(0); pal.A.fill(0); pal.Wh.fill(0); pal.G.fill(0); renderPalette(); palSave();
+  });
+  palCanvas.addEventListener('pointerdown', e => {
+    e.preventDefault(); try { palCanvas.setPointerCapture(e.pointerId); } catch (err) {}
+    const c = palCell(e);
+    if (palMode === 'pick') { palPick(c.x, c.y); return; }
+    palDrag = { id:e.pointerId, x:c.x, y:c.y, B: palSample(c.x, c.y, 6) };
+    if (palMode === 'put') palPut(c.x, c.y); else palMix(c.x, c.y, palDrag.B);
+    renderPalette();
+  });
+  palCanvas.addEventListener('pointermove', e => {
+    if (!palDrag || e.pointerId !== palDrag.id) return;
+    const c = palCell(e), dx = c.x - palDrag.x, dy = c.y - palDrag.y, L = Math.hypot(dx, dy);
+    const n = Math.ceil(L / 1.2);
+    for (let i = 1; i <= n; i++) { const x = palDrag.x + dx * i / n, y = palDrag.y + dy * i / n; if (palMode === 'put') palPut(x, y); else palMix(x, y, palDrag.B); }
+    if (n) { palDrag.x = c.x; palDrag.y = c.y; renderPalette(); }
+  });
+  const end = e => { if (palDrag && e.pointerId === palDrag.id) { palDrag = null; palSave(); } };
+  palCanvas.addEventListener('pointerup', end); palCanvas.addEventListener('pointercancel', end);
+  new ResizeObserver(sizePalette).observe(palCanvas);
+}
+function buildSettings(){
+  const ps = $('#paperSeg');
+  for (const k in PAPERS) {
+    const b = document.createElement('button'); b.textContent = PAPERS[k].label; b.dataset.k = k; b.title = PAPERS[k].hint;
+    b.addEventListener('click', () => { S.paper = k; saveSettings(); genPaper(); syncSettings(); toast(PAPERS[k].hint); });
+    ps.appendChild(b);
+  }
+  bindRange('bleed', () => S.bleed, v => S.bleed = v, v => v + '%');
+  bindRange('drySpd', () => S.drySpd, v => setDrySpeed(v), v => v + '%');
+  bindRange('vein', () => S.vein, v => setVein(v), v => v + '%');
+  bindRange('gran', () => S.gran, v => { S.gran = v; dirty = true; }, v => v + '%');
+  bindRange('curve', () => S.curve, v => S.curve = v, v => (v / 100).toFixed(1));
+  bindRange('stab', () => S.stab, v => S.stab = v, v => String(v));
+  $('#penOnly').checked = S.penOnly; $('#penOnly').addEventListener('change', e => { S.penOnly = e.target.checked; saveSettings(); });
+  $('#runout').checked = S.runout; $('#runout').addEventListener('change', e => { S.runout = e.target.checked; saveSettings(); });
+  syncSettings();
+}
+function syncSettings(){ $$('#paperSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === S.paper)); }
+
+const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.5 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4.4-1"/></svg>';
+const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+function renderLayers(){
+  markChanged();
+  const ul = $('#layerList'); ul.innerHTML = '';
+  [...layers].reverse().forEach(L => {
+    const li = document.createElement('li'); if (L === active) li.className = 'on';
+    const wet = L === simOwner && simHasContent && simSteps > 0;
+    li.innerHTML = `<button class="eye" title="表示/非表示" aria-label="表示切り替え">${L.visible ? EYE : EYE_OFF}</button>
+      <span class="lname">${L.name}${wet ? '<span class="wetdot" title="濡れています"></span>' : ''}</span>
+      <input type="range" min="0" max="100" value="${Math.round(L.opacity * 100)}" title="不透明度" aria-label="${L.name}の不透明度">
+      <span class="mv"><button class="up" title="上へ" aria-label="上へ">▲</button><button class="dn" title="下へ" aria-label="下へ">▼</button></span>
+      <button class="del" title="レイヤーを削除" aria-label="削除">${TRASH}</button>`;
+    li.addEventListener('click', ev => { if (ev.target.closest('button,input')) return; active = L; renderLayers(); });
+    li.querySelector('.eye').addEventListener('click', () => { L.visible = !L.visible; dirty = true; renderLayers(); });
+    const idx = layers.indexOf(L);
+    const up = li.querySelector('.up'), dn = li.querySelector('.dn');
+    up.disabled = idx === layers.length - 1; dn.disabled = idx === 0;
+    const move = d => { const j = idx + d; if (j < 0 || j >= layers.length) return; layers[idx] = layers[j]; layers[j] = L; dirty = true; renderLayers(); };
+    up.addEventListener('click', () => move(1)); dn.addEventListener('click', () => move(-1));
+    li.querySelector('input').addEventListener('input', ev => { L.opacity = ev.target.value / 100; dirty = true; markChanged(); });
+    const del = li.querySelector('.del');
+    del.addEventListener('click', () => {
+      if (!del.classList.contains('confirm')) { del.classList.add('confirm'); del.textContent = '削除'; setTimeout(() => { if (del.isConnected) { del.classList.remove('confirm'); del.innerHTML = TRASH; } }, 3000); return; }
+      deleteLayer(L);
+    });
+    ul.appendChild(li);
+  });
+  $('#addLayer').disabled = layers.length >= 8;
+}
+function syncPanelBtns(){
+  $('#layBtn').setAttribute('aria-pressed', !$('#layers').hidden); $('#setBtn').setAttribute('aria-pressed', !$('#settings').hidden);
+  const drawerOpen = $('#colorDrawer').classList.contains('open');
+  $('#scrim').hidden = !(isNarrow() && (drawerOpen || ['props', 'layers', 'settings'].some(id => !$('#' + id).hidden)));
+}
+// on phones only one panel is open at a time; on wide screens the tool panel stays put on the left
+function togglePanel(id, force){
+  const el = $('#' + id), open = force != null ? force : el.hidden;
+  if (open) {
+    if (isNarrow()) { ['props', 'layers', 'settings'].forEach(k => { if (k !== id) $('#' + k).hidden = true; }); setDrawer(false, true); }
+    else if (id !== 'props') ['layers', 'settings'].forEach(k => { if (k !== id) $('#' + k).hidden = true; });
+  }
+  el.hidden = !open; syncPanelBtns();
+}
+function setDrawer(open, quiet){
+  const d = $('#colorDrawer'); d.classList.toggle('open', open); d.setAttribute('aria-hidden', String(!open));
+  $('#colorChip').setAttribute('aria-expanded', String(open));
+  if (open) { if (isNarrow()) ['props', 'layers', 'settings'].forEach(k => $('#' + k).hidden = true); requestAnimationFrame(sizePalette); }
+  if (!quiet) syncPanelBtns();
+}
+$('#colorChip').addEventListener('click', () => setDrawer(!$('#colorDrawer').classList.contains('open')));
+$('#drawerClose').addEventListener('click', () => setDrawer(false));
+$('#scrim').addEventListener('pointerdown', e => { e.preventDefault(); ['props', 'layers', 'settings'].forEach(k => $('#' + k).hidden = true); setDrawer(false, true); syncPanelBtns(); });
+$$('[data-close]').forEach(b => b.addEventListener('click', () => { b.closest('.panel').hidden = true; syncPanelBtns(); }));
+window.addEventListener('keydown', e => { if (e.key === 'Escape') { setDrawer(false, true); if (isNarrow()) ['props', 'layers', 'settings'].forEach(k => $('#' + k).hidden = true); else ['layers', 'settings'].forEach(k => { if (k === 'settings') $('#' + k).hidden = true; }); syncPanelBtns(); } });
+
+/* light / dark */
+const hostTheme = document.documentElement.getAttribute('data-theme');
+const THEME_ICON = {
+  auto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>',
+  light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>',
+  dark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
+};
+const THEME_LABEL = { auto:'自動', light:'ライト', dark:'ダーク' };
+let theme = store.get('theme', 'auto');
+function applyTheme(){
+  const root = document.documentElement;
+  if (theme === 'auto') { if (hostTheme) root.setAttribute('data-theme', hostTheme); else root.removeAttribute('data-theme'); }
+  else root.setAttribute('data-theme', theme);
+  $('#themeIcon').innerHTML = THEME_ICON[theme]; $('#themeLbl').textContent = THEME_LABEL[theme];
+  $('#themeBtn').title = `表示：${THEME_LABEL[theme]}（タップで切り替え）`; $('#themeBtn').setAttribute('aria-label', $('#themeBtn').title);
+}
+$('#themeBtn').addEventListener('click', () => {
+  theme = { auto:'light', light:'dark', dark:'auto' }[theme] || 'auto';
+  store.set('theme', theme); applyTheme(); toast(`表示を「${THEME_LABEL[theme]}」にしました`);
+});
+applyTheme();
+
+$('#addLayer').addEventListener('click', () => { const L = addLayer(); if (L) { active = L; renderLayers(); } });
+$('#clearLayer').addEventListener('click', () => {
+  if (stroke) return;
+  const parts = [snapLayer(active, 0, 0, doc.w, doc.h)];
+  if (simOwner === active && simHasContent) { parts.push(snapSim()); clearSim(); }
+  clearF(active.fbo); pushUndo(parts); dirty = true; renderLayers(); toast(`「${active.name}」を白紙に戻しました（元に戻せます）`);
+});
+$('#undoBtn').addEventListener('click', undo);
+$('#redoBtn').addEventListener('click', redo);
+$('#dryBtn').addEventListener('click', dryNow);
+$('#zoomBtn').addEventListener('click', fitView);
+$('#handBtn').addEventListener('click', () => { setHand(!handMode); if (handMode) toast('手のひら：ペンでドラッグすると紙が動きます。道具を選ぶと描く状態に戻ります'); });
+$('#zoomIn').addEventListener('click', () => zoomStep(1.25));
+$('#zoomOut').addEventListener('click', () => zoomStep(.8));
+$('#layBtn').addEventListener('click', () => togglePanel('layers'));
+$('#setBtn').addEventListener('click', () => togglePanel('settings'));
+
+/* export */
+let lastURL = null, lastBlob = null, dlNS = null, dlBlocked = false;
+// inside claude.ai the viewer mediates downloads; opened as a local file, the plain link works
+if (window.claude && typeof window.claude.use === 'function') {
+  window.claude.use('downloads').then(ns => { dlNS = ns; }).catch(() => {});
+  // viewers outside the owner's organisation cannot download from the page: find out early and offer long-press instead
+  window.claude.use('permissions').then(pm => pm && pm.state('downloads')).then(st => { if (st === 'unavailable' || st === 'denied') dlBlocked = true; }).catch(() => {});
+}
+function syncDownloadUI(){
+  const inViewer = !!(window.claude && typeof window.claude.use === 'function');
+  const off = inViewer && (!dlNS || dlBlocked);
+  $('#dlLink').hidden = off;
+  $('#dlHint').innerHTML = off
+    ? '<b style="color:var(--ink)">画像を長押し</b>して保存してください（PCは右クリック →「名前を付けて画像を保存」）。この画面ではダウンロードボタンが使えません。'
+    : 'ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。';
+}
+$('#dlLink').addEventListener('click', e => {
+  if (!dlNS || !lastBlob) return;
+  e.preventDefault();
+  dlNS.save({ filename: $('#dlLink').download, data: lastBlob }).then(() => toast('保存しました')).catch(err => {
+    if (err && err.code === 'declined') return;
+    dlBlocked = true; syncDownloadUI();
+  });
+});
+$('#saveBtn').addEventListener('click', () => {
+  if (stroke) return;
+  flushDabs();
+  const t = mkTex(doc.w, doc.h, 'u8'), f = mkFbo([t]);
+  gl.disable(gl.BLEND); target(f);
+  const pp = PAPERS[S.paper];
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
+    u_doc:[doc.w, doc.h], u_canvas:[doc.w, doc.h], u_view:[0, 0, 1], u_export:1 };
+  const op = new Float32Array(8);
+  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = L && L.visible ? L.opacity : 0; }
+  U.u_op = op; U.u_wetOp = simOwner ? (simOwner.visible ? simOwner.opacity : 0) : 1;
+  U.u_gouache = GOUACHE_WHITE; U.u_wetIdx = simOwner ? layers.indexOf(simOwner) : layers.indexOf(active);
+  use(progs.comp, U); drawFull();
+  const px = new Uint8Array(doc.w * doc.h * 4);
+  gl.readPixels(0, 0, doc.w, doc.h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  target(null); freeTF(t, f); dirty = true;
+  const c2 = document.createElement('canvas'); c2.width = doc.w; c2.height = doc.h;
+  c2.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px.buffer), doc.w, doc.h), 0, 0);
+  c2.toBlob(blob => {
+    if (lastURL) URL.revokeObjectURL(lastURL);
+    lastURL = URL.createObjectURL(blob); lastBlob = blob;
+    $('#outImg').src = lastURL; $('#dlLink').href = lastURL;
+    const d = new Date(); const pad = n => String(n).padStart(2, '0');
+    $('#dlLink').download = `nijimi_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.png`;
+    $('#outSize').textContent = `${doc.w} × ${doc.h} px`;
+    // inside the Claude viewer without the download permission, a plain link does nothing: offer long-press / right-click instead
+    syncDownloadUI();
+    $('#modal').hidden = false;
+  }, 'image/png');
+});
+$('#closeModal').addEventListener('click', () => { $('#modal').hidden = true; });
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') $('#modal').hidden = true; });
+
+canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); fatal('GPUがリセットされました。ページを再読み込みしてください（描いた絵は失われます）。'); });
+
+/* ================= first-time hints ================= */
+function tipShown(k){ return !!store.get('tip:' + k, false); }
+let coachAnchor = null;
+function showCoach(anchor, key, title, html){
+  if (tipShown(key) || !$('#start').hidden || !$('#coach').hidden) return;
+  coachAnchor = anchor; $('#coachTitle').textContent = title; $('#coachText').innerHTML = html;
+  const c = $('#coach'); c.hidden = false; c.dataset.key = key; placeCoach();
+}
+function placeCoach(){
+  const c = $('#coach'); if (c.hidden || !coachAnchor) return;
+  const r = coachAnchor.getBoundingClientRect(), w = c.offsetWidth;
+  const left = clamp(r.left + r.width / 2 - 34, 12, innerWidth - w - 12);
+  c.style.left = left + 'px'; c.style.top = (r.bottom + 12) + 'px';
+  c.style.setProperty('--ax', clamp(r.left + r.width / 2 - left - 7, 14, w - 28) + 'px');
+}
+$('#coachOk').addEventListener('click', () => { const c = $('#coach'); store.set('tip:' + c.dataset.key, true); c.hidden = true; });
+window.addEventListener('resize', placeCoach);
+
+/* ================= keep one picture on this device (IndexedDB) ================= */
+const vault = {
+  db: null,
+  open(){ if (this.db) return Promise.resolve(this.db); return new Promise((res, rej) => { try { const r = indexedDB.open('nijimi', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => { this.db = r.result; res(this.db); }; r.onerror = () => rej(r.error); } catch (e) { rej(e); } }); },
+  async get(k){ const db = await this.open(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
+  async set(k, v){ const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); },
+  async del(k){ const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').delete(k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); },
+};
+const f32b = new Float32Array(1), u32b = new Uint32Array(f32b.buffer);
+function toHalf(v){ f32b[0] = v; const x = u32b[0], sign = (x >>> 16) & 0x8000, e = ((x >>> 23) & 0xff) - 112; if (e <= 0) return sign; if (e >= 31) return sign | 0x7bff; return sign | (e << 10) | ((x & 0x7fffff) >>> 13); }
+let halfRead = null;
+function readHalf(fbo, w, h){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  if (halfRead == null) halfRead = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE) === gl.HALF_FLOAT && gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT) === gl.RGBA;
+  let out;
+  if (halfRead) { out = new Uint16Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.HALF_FLOAT, out); }
+  else { const f = new Float32Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, f); out = new Uint16Array(f.length); for (let i = 0; i < f.length; i++) out[i] = f[i] === 0 ? 0 : toHalf(f[i]); }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); return out;
+}
+async function pack(u16){
+  if (typeof CompressionStream === 'undefined') return { raw:true, buf:u16.buffer };
+  const st = new Blob([u16]).stream().pipeThrough(new CompressionStream('gzip'));
+  return { raw:false, buf: await new Response(st).arrayBuffer() };
+}
+async function unpack(o){
+  if (o.raw) return new Uint16Array(o.buf);
+  const st = new Blob([o.buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint16Array(await new Response(st).arrayBuffer());
+}
+function thumbnail(){
+  const tw = 240, th = Math.max(1, Math.round(240 * doc.h / doc.w)), sc = tw / doc.w;
+  const t = mkTex(tw, th, 'u8'), f = mkFbo([t]);
+  gl.disable(gl.BLEND); target(f);
+  const pp = PAPERS[S.paper];
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
+    u_doc:[doc.w, doc.h], u_canvas:[tw, th], u_view:[0, 0, sc], u_export:1, u_gouache:GOUACHE_WHITE,
+    u_wetIdx: simOwner ? layers.indexOf(simOwner) : -1, u_wetOp: simOwner ? (simOwner.visible ? simOwner.opacity : 0) : 1 };
+  const op = new Float32Array(8);
+  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = L && L.visible ? L.opacity : 0; }
+  U.u_op = op; use(progs.comp, U); drawFull();
+  const px = new Uint8Array(tw * th * 4); gl.readPixels(0, 0, tw, th, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  target(null); freeTF(t, f); dirty = true;
+  const c = document.createElement('canvas'); c.width = tw; c.height = th;
+  c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px.buffer), tw, th), 0, 0);
+  return c.toDataURL('image/jpeg', .82);
+}
+let saveTimer = 0, saving = false, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
+function markChanged(){
+  if (!docReady || restoring || !vaultOK) return;
+  clearTimeout(saveTimer); saveTimer = setTimeout(saveDrawing, 2500);
+}
+async function saveDrawing(){
+  if (!docReady || !vaultOK) return;
+  if (stroke || saving) { clearTimeout(saveTimer); saveTimer = setTimeout(saveDrawing, 1500); return; }
+  saving = true; saveTimer = 0;
+  try {
+    flushDabs();
+    // read everything synchronously, then compress and store in the background
+    const raw = layers.map(L => readHalf(L.fbo, doc.w, doc.h));
+    let simRaw = null;
+    if (simOwner && simHasContent) {
+      const t = mkTex(sim.w, sim.h), f = mkFbo([t]);
+      gl.disable(gl.BLEND); target(f); use(progs.sum, { u_P:P[si], u_D:D[si] }); drawFull(); target(null);
+      simRaw = readHalf(f, sim.w, sim.h); freeTF(t, f);
+    }
+    const meta = { v:1, w:doc.w, h:doc.h, q:simQ, paper:S.paper, seed:paperSeed, active: layers.indexOf(active), owner: simRaw ? layers.indexOf(simOwner) : -1,
+      layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), savedAt: Date.now() };
+    const thumb = thumbnail();
+    const data = [];
+    for (const r of raw) data.push(await pack(r));
+    const simData = simRaw ? await pack(simRaw) : null;
+    await vault.set('drawing', { meta, data, simData, thumb });
+    if (!store.get('tip:saved', false)) { store.set('tip:saved', true); toast('描いた絵は、この端末に自動で保存されます'); }
+  } catch (err) {
+    console.warn('save failed', err);
+    if (err && err.name === 'QuotaExceededError') toast('端末の空き容量が足りず、保存できませんでした');
+  } finally { saving = false; }
+}
+async function restoreDrawing(rec){
+  restoring = true;
+  try {
+    const m = rec.meta;
+    S.paper = PAPERS[m.paper] ? m.paper : 'cold'; saveSettings();
+    createDoc(m.w, m.h, m.q, m.seed);
+    while (layers.length < m.layers.length) addLayer();
+    while (layers.length > m.layers.length) { const L = layers.pop(); freeTF(L.tex, L.fbo); }
+    for (let i = 0; i < layers.length; i++) {
+      const L = layers[i], info = m.layers[i];
+      L.name = info.name; L.visible = info.visible; L.opacity = info.opacity;
+      const px = await unpack(rec.data[i]);
+      gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, m.w, m.h, gl.RGBA, gl.HALF_FLOAT, px);
+    }
+    layerSeq = layers.length + 1;
+    active = layers[clamp(m.active, 0, layers.length - 1)] || layers[0];
+    if (rec.simData && m.owner >= 0 && layers[m.owner]) {
+      const px = await unpack(rec.simData);
+      gl.bindTexture(gl.TEXTURE_2D, D[si]); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, sim.w, sim.h, gl.RGBA, gl.HALF_FLOAT, px);
+      simOwner = layers[m.owner]; simHasContent = true; simSteps = 0;
+    }
+    syncSettings(); renderLayers(); dirty = true;
+    return true;
+  } catch (err) {
+    console.error(err); toast('保存した絵を読み込めませんでした。新しい紙で始めます'); createDoc(1200, 1600, simQ); return false;
+  } finally { restoring = false; }
+}
+let savedRec = null;
+async function checkSaved(){
+  if (!vaultOK) return;
+  try {
+    savedRec = await vault.get('drawing');
+    if (!savedRec || !savedRec.meta) { savedRec = null; return; }
+    const d = new Date(savedRec.meta.savedAt), pad = n => String(n).padStart(2, '0');
+    $('#resumeImg').src = savedRec.thumb || '';
+    $('#resumeTime').textContent = `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())} に保存 · ${PAPER_INFO[savedRec.meta.paper] ? PAPER_INFO[savedRec.meta.paper].name : ''}`;
+    if (st.first && !$('#start').hidden) {
+      $('#startWarn').hidden = false; $('#startWarn').textContent = '新しい紙で描きはじめると、保存されている前回の絵は上書きされます。'; $('#startGo').textContent = '新しい紙で描きはじめる';
+      showResumeView(true);
+    }
+  } catch (err) { vaultOK = false; console.warn('storage unavailable', err); }
+}
+$('#resumeGo').addEventListener('click', async () => {
+  if (!savedRec) return;
+  $('#resumeGo').disabled = true; $('#resumeGo').textContent = '読み込み中…';
+  const ok = await restoreDrawing(savedRec);
+  $('#resumeGo').disabled = false; $('#resumeGo').textContent = '続きから描く';
+  closeStart(); docReady = true;
+  if (ok) toast('前回の続きから描けます');
+});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && saveTimer) { clearTimeout(saveTimer); saveDrawing(); } });
+window.addEventListener('pagehide', () => { if (saveTimer) { clearTimeout(saveTimer); saveDrawing(); } });
+let forgetArmed = 0;
+$('#forgetBtn').addEventListener('click', async () => {
+  const b = $('#forgetBtn');
+  if (!forgetArmed) { b.textContent = '本当に消す'; b.classList.add('primary'); forgetArmed = setTimeout(() => { forgetArmed = 0; b.textContent = 'この端末の保存を消す'; b.classList.remove('primary'); }, 3500); return; }
+  clearTimeout(forgetArmed); forgetArmed = 0; b.textContent = 'この端末の保存を消す'; b.classList.remove('primary');
+  clearTimeout(saveTimer); saveTimer = 0;
+  try { await vault.del('drawing'); savedRec = null; docReady = false; toast('この端末の保存を消しました。次に描いたときから、また保存されます'); setTimeout(() => { docReady = true; }, 100); }
+  catch (e) { toast('保存を消せませんでした'); }
+});
+
+/* ================= start screen: choose the paper ================= */
+const PAPER_INFO = {
+  cold: { name:'水彩紙・中目', desc:'ほどよい凹凸。にじみも粒状感も出やすい定番' },
+  rough:{ name:'水彩紙・荒目', desc:'凹凸が深く、かすれと沈殿が強く出る' },
+  hot:  { name:'細目', desc:'なめらか。鉛筆やペンの線がきれい' },
+  washi:{ name:'和紙', desc:'繊維に沿って墨や絵の具がにじむ' },
+};
+const SIZES = [
+  { k:'land', label:'横', w:1600, h:1200 }, { k:'port', label:'縦', w:1200, h:1600 }, { k:'sq', label:'正方形', w:1400, h:1400 },
+  { k:'card', label:'はがき', w:1000, h:1480 }, { k:'small', label:'小さめ', w:1000, h:750, note:'軽い' }, { k:'big', label:'大判', w:2400, h:1800, note:'PC向け' },
+];
+const st = { paper:S.paper, size: innerWidth >= innerHeight ? 'land' : 'port', q: isCoarse ? .5 : 1, first:true };
+function paperThumb(key, w, h){
+  const pp = PAPERS[key];
+  const t = mkTex(w, h, 'u8'), f = mkFbo([t]);
+  gl.disable(gl.BLEND); target(f);
+  use(progs.paper, { u_seed:7.3, u_scale:pp.scale, u_bump:pp.bump, u_large:pp.large, u_fine:pp.fine, u_fiber:pp.fiber }); drawFull();
+  const px = new Uint8Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  target(null); freeTF(t, f);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const cx = c.getContext('2d'); const img = cx.createImageData(w, h);
+  const H = (x, y) => px[(clamp(y, 0, h - 1) * w + clamp(x, 0, w - 1)) * 4] / 255;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const hv = H(x, y), sh = 1 + ((H(x + 1, y) - H(x - 1, y)) + (H(x, y + 1) - H(x, y - 1))) * .22 * pp.shade, rel = 1 - (1 - hv) * .06 * pp.shade;
+    const i = ((h - 1 - y) * w + x) * 4;
+    for (let k = 0; k < 3; k++) img.data[i + k] = clamp(pp.col[k] * sh * rel, 0, 1) * 255;
+    img.data[i + 3] = 255;
+  }
+  cx.putImageData(img, 0, 0); return c.toDataURL();
+}
+function buildStart(){
+  const pc = $('#paperCards');
+  for (const k in PAPERS) {
+    const b = document.createElement('button'); b.className = 'pcard'; b.dataset.k = k;
+    let url = ''; try { url = paperThumb(k, 160, 120); } catch (e) {}
+    b.innerHTML = `<span class="thumb" style="background-image:url(${url})"></span><b>${PAPER_INFO[k].name}</b><small>${PAPER_INFO[k].desc}</small>`;
+    b.addEventListener('click', () => { st.paper = k; syncStart(); });
+    pc.appendChild(b);
+  }
+  const sc = $('#sizeChips');
+  for (const z of SIZES) {
+    const b = document.createElement('button'); b.dataset.k = z.k;
+    const m = 18 / Math.max(z.w, z.h);
+    b.innerHTML = `<i style="width:${Math.round(z.w * m)}px;height:${Math.round(z.h * m)}px"></i><span>${z.label}${z.note ? ` <small>${z.note}</small>` : ''}</span>`;
+    b.title = `${z.w} × ${z.h}`;
+    b.addEventListener('click', () => { st.size = z.k; syncStart(); });
+    sc.appendChild(b);
+  }
+  $$('#qSeg button').forEach(b => b.addEventListener('click', () => { st.q = +b.dataset.q; syncStart(); }));
+  $('#moreBtn').addEventListener('click', () => { const box = $('#moreBox'); box.hidden = !box.hidden; $('#moreBtn').setAttribute('aria-expanded', String(!box.hidden)); $('#moreBtn').textContent = box.hidden ? '細かく設定する ＋' : '細かい設定を閉じる －'; });
+  const bind = (id, get, set) => { const el = $('#' + id), out = $('#' + id + 'V'); el.addEventListener('input', () => { set(+el.value); out.textContent = el.value + '%'; }); };
+  bind('st_bleed', () => S.bleed, v => { S.bleed = v; $('#bleed').value = v; $('#bleedV').textContent = v + '%'; saveSettings(); });
+  bind('st_vein', () => S.vein, v => setVein(v));
+  bind('st_gran', () => S.gran, v => { S.gran = v; $('#gran').value = v; $('#granV').textContent = v + '%'; saveSettings(); dirty = true; });
+  bind('st_dry', () => S.drySpd, v => setDrySpeed(v));
+  $('#startGo').addEventListener('click', () => {
+    const firstRun = st.first;
+    const z = SIZES.find(x => x.k === st.size) || SIZES[0];
+    if (stroke) cancelStroke();
+    S.paper = st.paper; saveSettings();
+    try { createDoc(z.w, z.h, st.q); }
+    catch (err) { console.error(err); toast('メモリが足りないため、小さめ・軽量の紙にしました'); createDoc(1000, 750, .5); }
+    syncSettings(); closeStart(); docReady = true;
+    toast(firstRun && isNarrow() ? '道具をもう一度タップで太さなどの調整、右上の丸で色とパレット' : `${PAPER_INFO[S.paper].name}（${z.label}）を用意しました`);
+  });
+  $('#startKeep').addEventListener('click', () => { S.paper = st.paper; saveSettings(); genPaper(); syncSettings(); closeStart(); markChanged(); toast(`紙の質感を「${PAPER_INFO[S.paper].name}」に変えました`); });
+  $('#startClose').addEventListener('click', closeStart);
+  $('#start').addEventListener('pointerdown', e => { if (e.target.id === 'start' && !st.first) closeStart(); });
+}
+function syncStart(){
+  $$('#paperCards .pcard').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === st.paper)));
+  $$('#sizeChips button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === st.size)));
+  $$('#qSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.q === st.q)));
+  [['st_bleed', S.bleed], ['st_vein', S.vein], ['st_gran', S.gran], ['st_dry', S.drySpd]].forEach(([id, v]) => { $('#' + id).value = v; $('#' + id + 'V').textContent = v + '%'; });
+}
+function openStart(first){
+  st.first = first; st.paper = S.paper;
+  if (!first) {
+    const cur = SIZES.find(z => z.w === doc.w && z.h === doc.h); if (cur) st.size = cur.k; st.q = simQ;
+  }
+  $('#startClose').hidden = first; $('#startKeep').hidden = first; $('#startWarn').hidden = first; $('#resume').hidden = true;
+  $('#startWarn').textContent = '新しい紙にすると、今の絵は消えます（必要なら先に「画像を保存」してください）。'; $('#startGo').classList.add('primary');
+  $('#startGo').textContent = first ? 'この紙で描きはじめる' : '新しい紙で描きはじめる';
+  ['props', 'layers', 'settings'].forEach(k => { if (isNarrow() || k === 'settings') $('#' + k).hidden = true; }); setDrawer(false, true); syncPanelBtns();
+  syncStart(); $('#start').hidden = false;
+  $('#stPick').hidden = false; $('#backResume').hidden = true; $('.startcard').scrollTop = 0;
+  setTimeout(() => $('#startGo').focus({ preventScroll:true }), 50);
+}
+// with a saved picture, the start screen opens on it; the paper picker is one step away
+function showResumeView(on){
+  $('#resume').hidden = !on; $('#stPick').hidden = on; $('#backResume').hidden = on || !savedRec;
+  $('.startcard').scrollTop = 0;
+  if (on) setTimeout(() => $('#resumeGo').focus({ preventScroll:true }), 50);
+}
+$('#toPick').addEventListener('click', () => { showResumeView(false); setTimeout(() => $('#startGo').focus({ preventScroll:true }), 50); });
+$('#backResume').addEventListener('click', () => showResumeView(true));
+function closeStart(){ $('#start').hidden = true; if (isNarrow()) $('#props').hidden = true; syncPanelBtns(); }
+$('#paperBtn').addEventListener('click', () => openStart(false));
+$('#paperBtn2').addEventListener('click', () => openStart(false));
+
+/* ================= boot ================= */
+buildTools(); buildProps(); buildSettings();
+if (isNarrow()) { $('#props').hidden = true; $('#layers').hidden = true; }
+syncPanelBtns(); syncProps();
+readStageBg();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readStageBg);
+new MutationObserver(readStageBg).observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
+window.addEventListener('resize', () => { resize(); syncPanelBtns(); });
+new ResizeObserver(() => resize()).observe(stage);
+const landscape = innerWidth >= innerHeight;
+const q0 = isCoarse ? .5 : 1;
+try { createDoc(landscape ? 1600 : 1200, landscape ? 1200 : 1600, q0); }
+catch (err) { console.error(err); try { createDoc(1000, 750, .5); } catch (e2) { fatal('GPUメモリが足りず起動できませんでした。'); return; } }
+updateWetUI(true);
+buildStart(); openStart(true); checkSaved();
+window.__nijimi = { get S(){ return S; }, undo, redo, dryNow, get simSteps(){ return simSteps; }, fitView, createDoc, get view(){ return view; },
+  step(n){ for (let i = 0; i < n; i++) simStep(); }, params: () => simParams(),
+  readSim(which, x, y, w, h){ const f = { W:fW, P:fP, D:fD }[which][si]; gl.bindFramebuffer(gl.FRAMEBUFFER, f); const px = new Float32Array(w * h * 4); gl.readPixels(x, y, w, h, gl.RGBA, gl.FLOAT, px); gl.bindFramebuffer(gl.FRAMEBUFFER, null); return Array.from(px); } };
+requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// install as an app (PWA): works only when served over https (or localhost)
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>

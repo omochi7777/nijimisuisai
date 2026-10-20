@@ -1,0 +1,17 @@
+{
+  "name": "にじみ帖",
+  "short_name": "にじみ帖",
+  "description": "水の流れと顔料を計算する、水彩・墨・ガッシュ・鉛筆・Gペンのお絵かきアプリ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#efeae1",
+  "theme_color": "#efeae1",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
