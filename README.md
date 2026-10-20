@@ -98,10 +98,6 @@ Windows では、ワコムタブレットのプロパティで「Windows Ink を
 | icon-*.png / apple-touch-icon.png | アイコン |
 | LICENSE | ライセンス（MIT） |
 
-## 更新するとき
-
-index.html を変えたら、sw.js の `VERSION = 'nijimi-v3'` の数字を上げてから一緒にコミットしてください。インストール済みの端末が新しい版に入れ替わります。
-
 ## ライセンス
 
 [MIT License](LICENSE) © 2026 omochi7777
