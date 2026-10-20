@@ -96,7 +96,16 @@ Windows では、ワコムタブレットのプロパティで「Windows Ink を
 | manifest.webmanifest | PWAの設定（名前・アイコン・色） |
 | sw.js | オフラインで動かすためのサービスワーカー |
 | icon-*.png / apple-touch-icon.png | アイコン |
+| LICENSE | ライセンス（MIT） |
 
 ## 更新するとき
 
-index.html を変えたら、sw.js の `VERSION = 'nijimi-v1'` の数字を上げてから一緒にコミットしてください。インストール済みの端末が新しい版に入れ替わります。
+index.html を変えたら、sw.js の `VERSION = 'nijimi-v3'` の数字を上げてから一緒にコミットしてください。インストール済みの端末が新しい版に入れ替わります。
+
+## ライセンス
+
+[MIT License](LICENSE) © 2026 omochi7777
+
+使う・改造する・再配布する・商用で使うのも自由です。再配布するときは、著作権表示と LICENSE の文面を一緒に残してください。無保証です。
+
+画面の文字に使っている Zen Maru Gothic と Klee One は Google Fonts から読み込んでいます。どちらも SIL Open Font License 1.1 で、このリポジトリには含まれていません。
