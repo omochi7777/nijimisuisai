@@ -1647,7 +1647,7 @@ canvas.addEventListener('pointerdown', e => {
       if (stroke && stroke.ptype === 'touch') { if (performance.now() - stroke.t0 < 350 || (stroke.distTotal || 0) < 30 / view.z) cancelStroke(); else endStroke(); }
       gestureBase(); return;
     }
-    if (S.penOnly) { gestureBase(); return; }
+    if (S.penOnly || handMode) { gestureBase(); return; }   // one finger pans (a second finger turns it into a pinch)
   }
   // pan: hand tool, space, wheel button, right button, or the pen's side button
   if (e.button === 1 || (e.pointerType === 'mouse' && (spaceDown || e.button === 2)) || ((handMode || spaceDown) && e.pointerType !== 'touch') || (e.pointerType === 'pen' && (e.buttons & 2))) {
@@ -2007,7 +2007,7 @@ function buildSettings(){
   const ps = $('#paperSeg');
   for (const k in PAPERS) {
     const b = document.createElement('button'); b.textContent = PAPERS[k].label; b.dataset.k = k; b.title = PAPERS[k].hint;
-    b.addEventListener('click', () => { S.paper = k; saveSettings(); genPaper(); syncSettings(); toast(PAPERS[k].hint); });
+    b.addEventListener('click', () => { S.paper = k; saveSettings(); genPaper(); syncSettings(); markChanged(); toast(PAPERS[k].hint); });
     ps.appendChild(b);
   }
   bindRange('bleed', () => S.bleed, v => S.bleed = v, v => v + '%');
@@ -2241,7 +2241,7 @@ function thumbnail(){
   c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px.buffer), tw, th), 0, 0);
   return c.toDataURL('image/jpeg', .82);
 }
-let saveTimer = 0, saving = false, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
+let saveTimer = 0, saving = false, saveGen = 0, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
 function markChanged(){
   if (!docReady || restoring || !vaultOK) return;
   clearTimeout(saveTimer); saveTimer = setTimeout(saveDrawing, 2500);
@@ -2250,6 +2250,7 @@ async function saveDrawing(){
   if (!docReady || !vaultOK) return;
   if (stroke || saving) { clearTimeout(saveTimer); saveTimer = setTimeout(saveDrawing, 1500); return; }
   saving = true; saveTimer = 0;
+  const gen = saveGen;   // bumped when the save is deleted: a save still compressing must not bring it back
   try {
     flushDabs();
     // read everything synchronously, then compress and store in the background
@@ -2266,6 +2267,7 @@ async function saveDrawing(){
     const data = [];
     for (const r of raw) data.push(await pack(r));
     const simData = simRaw ? await pack(simRaw) : null;
+    if (gen !== saveGen) return;
     await vault.set('drawing', { meta, data, simData, thumb });
     if (!store.get('tip:saved', false)) { store.set('tip:saved', true); toast('描いた絵は、この端末に自動で保存されます'); }
   } catch (err) {
@@ -2330,7 +2332,7 @@ $('#forgetBtn').addEventListener('click', async () => {
   const b = $('#forgetBtn');
   if (!forgetArmed) { b.textContent = '本当に消す'; b.classList.add('primary'); forgetArmed = setTimeout(() => { forgetArmed = 0; b.textContent = 'この端末の保存を消す'; b.classList.remove('primary'); }, 3500); return; }
   clearTimeout(forgetArmed); forgetArmed = 0; b.textContent = 'この端末の保存を消す'; b.classList.remove('primary');
-  clearTimeout(saveTimer); saveTimer = 0;
+  clearTimeout(saveTimer); saveTimer = 0; saveGen++;
   try { await vault.del('drawing'); savedRec = null; docReady = false; toast('この端末の保存を消しました。次に描いたときから、また保存されます'); setTimeout(() => { docReady = true; }, 100); }
   catch (e) { toast('保存を消せませんでした'); }
 });
