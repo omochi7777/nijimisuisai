@@ -1,6 +1,6 @@
 // にじみ帖 service worker: keeps the app usable offline.
 // Bump VERSION whenever index.html changes so phones pick up the new build.
-const VERSION = 'nijimi-v1';
+const VERSION = 'nijimi-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
