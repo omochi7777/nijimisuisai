@@ -604,6 +604,7 @@ void main(){
   float outF = F.x + F.y + F.z + F.w;
   float hn = h - outF;
   vec4 Pn = P * (1. - (h > 1e-5 ? clamp(outF / h, 0., 1.) : 0.) * u_pdrag);
+  float stir = W.b * (1. - (h > 1e-5 ? clamp(outF / h, 0., 1.) : 0.));   // how stirred the water is: rides along with it
   ivec2 off[4] = ivec2[4](ivec2(-1,0), ivec2(1,0), ivec2(0,-1), ivec2(0,1));
   int opp[4] = int[4](1, 0, 3, 2);
   float sigC = u_sigB + u_sigV * thrSrc(c);
@@ -614,7 +615,7 @@ void main(){
     vec4 Wq = texelFetch(u_W,q,0), Fq = texelFetch(u_F,q,0), Pq = texelFetch(u_P,q,0);
     float fin = Fq[opp[i]];
     hn += fin; finT += fin;
-    if(fin > 0. && Wq.r > 1e-5) Pn += Pq * clamp(fin / Wq.r, 0., 1.) * u_pdrag;
+    if(fin > 0. && Wq.r > 1e-5){ Pn += Pq * clamp(fin / Wq.r, 0., 1.) * u_pdrag; stir += Wq.b * clamp(fin / Wq.r, 0., 1.); }
     if(h > 1e-4 && Wq.r > 1e-4){
       float wd = clamp(min(h, Wq.r) / .1, 0., 1.) * (.25 + .9 * vnoise(vec2(c + q) * .07 + 3.7) + .6 * vnoise(vec2(c + q) * .21 + 9.1));
       float vv = .5 * (paperAt(c).a + paperAt(q).a);
@@ -635,8 +636,9 @@ void main(){
   hn -= u_evap * (1. + u_edgeEvap * dryN / 8.) * mix(1., .25 + .75 * smoothstep(.03, .2, hn), u_thinSlow);
   if(hn <= 1e-4){ hn = 0.; s -= u_evapS; }
   s = clamp(s, 0., 1.);
+  stir = hn > 1e-4 ? min(stir * .9996, 1.) : 0.;   // the stir settles over several seconds
   // a slow stir inside moving water: the ink follows a drifting, swirling (divergence-free) field and curls into eddies
-  if(u_swirl > 0. && hn > .02){
+  if(u_swirl > 0. && hn > .02 && stir > .01){
     // stirring is strongest where the water runs fast, but ink keeps curling slowly even in a calm pool
     float sp = .35 + .65 * clamp(length(vec2(F.y - F.x, F.w - F.z)) / max(h, .03) * 3., 0., 1.);
     {
@@ -644,7 +646,7 @@ void main(){
       #define PSI(v) (vnoise(v) + .5 * vnoise((v) * 2.3 + 7.1))
       float e = .35;
       vec2 curl = vec2(PSI(q0 + vec2(0, e)) - PSI(q0 - vec2(0, e)), PSI(q0 - vec2(e, 0)) - PSI(q0 + vec2(e, 0))) / (2. * e);
-      vec2 d = curl * u_swirl * sp; float dl = length(d); if(dl > .8) d *= .8 / dl;
+      vec2 d = curl * u_swirl * sp * min(1., stir * 1.5); float dl = length(d); if(dl > .8) d *= .8 / dl;
       vec2 uvb = (vec2(c) + .5 - d) / vec2(SZ);
       if(texture(u_W, uvb).r > .02) Pn += texture(u_P, uvb) - P;
     }
@@ -659,7 +661,7 @@ void main(){
   vec4 dP = Pn * dep, dD = D * des;
   Pn += dD - dP; D += dP - dD;
   if(hn <= 0.){ D += Pn; Pn = vec4(0); }
-  oW = vec4(min(hn, 3.), s, 0., 0.);
+  oW = vec4(min(hn, 3.), s, stir, 0.);
   oP = max(Pn, 0.);
   oD = max(D, 0.);
 }`;
@@ -761,7 +763,7 @@ float tipMask(vec2 l, float r, vec2 dir, float p, float pap, out float along){
 }
 `;
 const FS_BRUSH = HEAD + NOISE + DAB_IN + SHAPE + `
-uniform vec3 u_pig; uniform float u_gran, u_wAmt, u_pAmt, u_dFrac;
+uniform vec3 u_pig; uniform float u_gran, u_wAmt, u_pAmt, u_dFrac, u_stir;   // u_stir: dropped ink stirs the water it lands in (brushed paint does not)
 layout(location=0) out vec4 oW; layout(location=1) out vec4 oP; layout(location=2) out vec4 oD;
 void main(){
   float r = v_a.z; if(length(v_local) > r * 1.12 + 1.) discard;
@@ -772,7 +774,7 @@ void main(){
   float bristle = vnoise(vec2(along * 9. + u_seed * 13., u_seed * 3.));
   float thr = 1. - res * 1.7 + (bristle - .5) * .7 * (1. - res);
   float m = fall * smoothstep(thr - .1, thr + .1, pap + (hash12(v_docpx) - .5) * .12) * k;
-  oW = vec4(u_wAmt * m * (.35 + .65*res) * (.5 + .5*p), 0., 0., 0.);
+  oW = vec4(u_wAmt * m * (.35 + .65*res) * (.5 + .5*p), 0., u_stir * m, 0.);
   float pa = u_pAmt * m * (.5 + .5*res) * (.4 + .6*p);
   vec4 pig = vec4(u_pig * pa, u_gran * dot(u_pig, vec3(1./3.)) * pa);
   oP = pig * (1. - u_dFrac);
@@ -1489,7 +1491,7 @@ function flushDabs(){
     const wshape = { u_shape: tool === 'flat' ? 1 : tool === 'drop' ? 2 : 0, u_hard: tool === 'sumi' ? .8 : tool === 'water' ? .7 : tool === 'flat' ? .86 : .78, u_plod: simLod(), u_seed:I.seed % 10 };
     const whiteWash = I.white && tool !== 'water';
     use(progs.brush, { u_doc:docU, u_pad:0, u_paper:paperTex, u_pig:I.abs, u_gran: tool === 'sumi' ? I.gran * .3 : I.gran,
-      u_wAmt:wa, u_pAmt: whiteWash ? 0 : pa, u_dFrac:0, ...wshape });
+      u_wAmt:wa, u_pAmt: whiteWash ? 0 : pa, u_dFrac:0, u_stir: tool === 'drop' ? 1 : 0, ...wshape });
     draw();
     if (whiteWash) {
       gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
@@ -1629,7 +1631,7 @@ function stepTendrils(){
     gl.bindVertexArray(dabVAO); gl.bindBuffer(gl.ARRAY_BUFFER, dabBuf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STREAM_DRAW);
     use(progs.brush, { u_doc:[doc.w, doc.h], u_pad:0, u_paper:paperTex, u_pig:gp.abs, u_gran:gp.gran * .5,
       // on a tilted sheet most of it stays in the moving water, so the threads get carried along instead of staying pinned
-      u_wAmt:.01, u_pAmt:.17 * (.6 + .4 * v), u_dFrac: clamp(.35 + .2 * v, .35, .7) * (1 - .75 * Math.min(1, tl * 2)), u_shape:0, u_hard:.2, u_plod: simLod(), u_seed: 3.3 });
+      u_wAmt:.01, u_pAmt:.17 * (.6 + .4 * v), u_dFrac: clamp(.35 + .2 * v, .35, .7) * (1 - .75 * Math.min(1, tl * 2)), u_stir:0, u_shape:0, u_hard:.2, u_plod: simLod(), u_seed: 3.3 });
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gp.list.length);
   }
   gl.disable(gl.BLEND); gl.bindVertexArray(null);
@@ -1669,10 +1671,10 @@ function fpenBleed(st, held){
   const sh = { u_doc:[doc.w, doc.h], u_pad:0, u_paper:paperTex, u_pig:qInfo.abs.map(v => Math.min(4, v * 1.15 + .04)), u_gran:0, u_shape:2, u_hard:.5, u_plod: simLod() };
   // the paper just around the ink grows damp first, then the ink creeps out into it
   gl.bufferData(gl.ARRAY_BUFFER, wet, gl.STREAM_DRAW);
-  use(progs.brush, { ...sh, u_wAmt:.025 * amt, u_pAmt:0, u_dFrac:0, u_seed: Math.random() * 10 });
+  use(progs.brush, { ...sh, u_wAmt:.025 * amt, u_pAmt:0, u_dFrac:0, u_stir:0, u_seed: Math.random() * 10 });
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n);
   gl.bufferData(gl.ARRAY_BUFFER, ink, gl.STREAM_DRAW);
-  use(progs.brush, { ...sh, u_wAmt:.07 * amt, u_pAmt:.3 * amt, u_dFrac:.3, u_seed: Math.random() * 10 });
+  use(progs.brush, { ...sh, u_wAmt:.07 * amt, u_pAmt:.3 * amt, u_dFrac:.3, u_stir:.7, u_seed: Math.random() * 10 });
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n);
   gl.disable(gl.BLEND); gl.bindVertexArray(null);
   simHasContent = true; wake(); dirty = true;
