@@ -114,6 +114,8 @@ button,input,select{font:inherit;color:inherit}
 .tiltinfo{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .tiltinfo span{font-size:12.5px}
 #tiltBtn .arr{width:14px;height:14px;transition:transform .2s}
+#rotBtn{gap:4px;padding:0 9px 0 7px;border-color:var(--accent)}
+#rotBtn svg{width:16px;height:16px;transition:transform .2s}
 #tiltBtn.tilted{border-color:var(--wet);color:var(--wet)}
 .mclose{display:none}
 #scrim{position:absolute;inset:0;z-index:6;background:rgba(12,16,22,.26)}
@@ -270,7 +272,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
   #top{gap:3px;padding-left:max(6px,env(safe-area-inset-left,0px));padding-right:max(6px,env(safe-area-inset-right,0px))}
   #top .btn{padding:0 7px;min-width:34px;height:36px}
   #zoomBtn{padding:0 4px!important;font-size:11px}
-  #handBtn,#zoomOut,#zoomIn{display:none}
+  #handBtn,#zoomOut,#zoomIn,#rotL,#rotR{display:none}
 }
 /* ================= technique note: a notebook that slides out from the left, opened only when wanted ================= */
 #noteBtn{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:12px;z-index:7;display:flex;align-items:center;gap:6px;height:40px;padding:0 15px 0 11px;border:1px solid var(--line);border-radius:20px;background:color-mix(in srgb,var(--panel) 90%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 4px 14px rgba(0,0,0,.14);cursor:pointer;font-family:var(--font-hand);font-weight:600;font-size:14px;letter-spacing:.04em;color:var(--ink)}
@@ -405,6 +407,9 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <button class="btn icon" id="zoomOut" title="縮小 (-)" aria-label="縮小"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M7.5 10.5h6M15.5 15.5 20 20"/></svg></button>
       <button class="btn mono" id="zoomBtn" title="画面に合わせる (0)">100%</button>
       <button class="btn icon" id="zoomIn" title="拡大 (+)" aria-label="拡大"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M7.5 10.5h6M10.5 7.5v6M15.5 15.5 20 20"/></svg></button>
+      <button class="btn icon" id="rotL" title="画面を左に回す (Shift+R)" aria-label="画面を左に回す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
+      <button class="btn mono" id="rotBtn" title="回転を戻す" hidden><svg id="rotIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg><span id="rotText">0°</span></button>
+      <button class="btn icon" id="rotR" title="画面を右に回す (R)" aria-label="画面を右に回す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
     </span>
     <button class="btn" id="themeBtn" title="表示の明るさ（自動・ライト・ダーク）"><span id="themeIcon"></span><span class="lbl" id="themeLbl">自動</span></button>
     <button class="btn" id="paperBtn" title="新しい紙を選ぶ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M12 10v6" stroke-linecap="round"/></svg><span class="lbl">新しい紙</span></button>
@@ -823,11 +828,12 @@ uniform sampler2D u_L0,u_L1,u_L2,u_L3,u_L4,u_L5,u_L6,u_L7;
 uniform float u_op[8];
 uniform sampler2D u_W, u_P, u_D, u_paper;
 uniform float u_wetOp, u_shade; uniform vec3 u_paperCol, u_bg, u_gouache; uniform int u_wetIdx;
-uniform vec2 u_doc, u_canvas; uniform vec3 u_view; uniform int u_export;
+uniform vec2 u_doc, u_canvas; uniform vec3 u_view; uniform vec2 u_rot; uniform int u_export;   // u_rot: cos, sin of the view's turn
 out vec4 o;
 void main(){
   vec2 sp = gl_FragCoord.xy; if(u_export == 0) sp.y = u_canvas.y - sp.y;
-  vec2 dp = (sp - u_view.xy) / u_view.z;
+  vec2 rel = (sp - u_view.xy) / u_view.z;
+  vec2 dp = vec2(rel.x * u_rot.x + rel.y * u_rot.y, -rel.x * u_rot.y + rel.y * u_rot.x);
   if(dp.x < 0. || dp.y < 0. || dp.x > u_doc.x || dp.y > u_doc.y){
     vec2 q = max(max(-dp, dp - u_doc), 0.) * u_view.z;
     float sh = exp(-length(q) * .09) * .22;
@@ -843,7 +849,9 @@ void main(){
   vec2 ts = max(1., 1. / u_view.z) / u_doc;
   float hx = textureLod(u_paper, uv + vec2(ts.x,0), plod).r - textureLod(u_paper, uv - vec2(ts.x,0), plod).r;
   float hy = textureLod(u_paper, uv + vec2(0,ts.y), plod).r - textureLod(u_paper, uv - vec2(0,ts.y), plod).r;
-  float shade = 1. + (hx + hy) * .1 * u_shade;
+  // the light stays put on the screen when the paper is turned: turn the paper's slope into screen axes
+  vec2 hs = vec2(hx * u_rot.x - hy * u_rot.y, hx * u_rot.y + hy * u_rot.x);
+  float shade = 1. + (hs.x + hs.y) * .1 * u_shade;
   float relief = 1. - (1. - pap) * .03 * u_shade;
   vec3 base = u_paperCol * shade * relief * (1. - .07 * wet);
   vec3 col = base;
@@ -853,7 +861,8 @@ void main(){
   vec2 wt = 1. / vec2(textureSize(u_W, 0));
   float wx = texture(u_W, uv + vec2(wt.x,0)).r - texture(u_W, uv - vec2(wt.x,0)).r;
   float wy = texture(u_W, uv + vec2(0,wt.y)).r - texture(u_W, uv - vec2(0,wt.y)).r;
-  vec3 n = normalize(vec3(-wx * 7., wy * 7., 1.));
+  vec2 ws = vec2(wx * u_rot.x - wy * u_rot.y, wx * u_rot.y + wy * u_rot.x);
+  vec3 n = normalize(vec3(-ws.x * 7., ws.y * 7., 1.));
   vec3 hv = normalize(normalize(vec3(-.45, .55, 1.)) + vec3(0,0,1));
   float spec = pow(max(dot(n, hv), 0.), 70.) * smoothstep(.01, .3, Wt.r) * .4 * u_wetOp;
   col += spec;
@@ -1264,7 +1273,7 @@ const W = [], P = [], D = [], F = [], simFbo = [], fW = [], fP = [], fD = [], fF
 let si = 0, fi = 0;
 let scratch, scratchF, backup, backupF;
 let simOwner = null, simHasContent = false, simSteps = 0, simBoost = 1, simTime = 0, swirlClock = 0;   // swirlClock never jumps, so eddies drift smoothly
-let view = { x:0, y:0, z:1 }, dirty = true;
+let view = { x:0, y:0, z:1, r:0 }, dirty = true;   // x, y: where the paper's corner sits on screen; z: zoom; r: turn (radians, clockwise)
 let undoStack = [], redoStack = [], undoBytes = 0;
 const UNDO_BUDGET = (isCoarse ? 200 : 520) * 1024 * 1024;
 
@@ -1276,7 +1285,7 @@ function simParams(){
     evap: .00024 * dry * simBoost, edgeEvap: 6, absorb: pp.absorb, sCost: pp.sCost, capK: Math.min(.95, pp.capK * 4 * bleed),
     delta: pp.delta / (.5 + .5 * bleed), sigB: pp.sigB / (.6 + .4 * bleed), sigV: pp.sigV / (.6 + .4 * bleed), evapS: .0009 * dry * simBoost,
     vein: S.vein / 100, dep: .001, depDry: .1, desorb: .0012, pdiff: Math.min(.16, .1 * bleed) * (1 - .6 * tf), bloom: 3.5, granStr: S.gran / 100,
-    tilt: [tilt.x * TILT_K / simQ, tilt.y * TILT_K / simQ], breach: tf > 0 ? TILT_BREACH : 99,
+    tilt: (t => [t.x * TILT_K / simQ, t.y * TILT_K / simQ])(rotV(tilt.x, tilt.y, -view.r)), breach: tf > 0 ? TILT_BREACH : 99,
     pdrag: 1 - .6 * tf, swirl: .6 * tf, film: .05 * tf, thinSlow: tf,
   };
 }
@@ -1309,7 +1318,7 @@ function createDoc(w, h, q, seed){
   layerSeq = 1;
   addLayer('水彩'); addLayer('線画');
   active = layers[0];
-  renderLayers(); fitView(); updateUndoUI(); dirty = true;
+  renderLayers(); view.r = 0; updateRotUI(); fitView(); updateUndoUI(); dirty = true;
 }
 function genPaper(){
   const pp = PAPERS[S.paper];
@@ -1505,10 +1514,10 @@ function emitDab(pt, stationary){
   if (tool === 'pencil') { bx = pt.tx; by = pt.ty; }
   if (tool === 'drop') { bx = 0; by = 0; }
   // angle counted the way a calligrapher does (40° = edge rising to the right); a rotating pen turns the nib
-  if (tool === 'calli') { const a = ((pt.tw || 0) - (ts.angle || 0)) * Math.PI / 180; bx = Math.cos(a); by = Math.sin(a); }
+  if (tool === 'calli') { const a = ((pt.tw || 0) - (ts.angle || 0)) * Math.PI / 180 - view.r; bx = Math.cos(a); by = Math.sin(a); }
   if (isFlatTool(tool, ts)) {
     // the chisel edge keeps its angle in the hand; a pen that reports barrel rotation turns it
-    const a = ((ts.angle || 0) + (pt.tw || 0)) * Math.PI / 180;
+    const a = ((ts.angle || 0) + (pt.tw || 0)) * Math.PI / 180 - view.r;   // held in the hand: a turned paper turns under it
     const ex = Math.cos(a), ey = Math.sin(a);
     bx = ex; by = ey;
     const dl = Math.hypot(st.dir[0], st.dir[1]) || 1, dx = st.dir[0] / dl, dy = st.dir[1] / dl;
@@ -1715,7 +1724,7 @@ function spawnTendrils(x, y, R, a0, spread, n, scale){
 function stepTendrils(){
   if (!tips.length) return;
   const v = S.vein / 100;
-  const tl = Math.hypot(tilt.x, tilt.y), ta = Math.atan2(tilt.y, tilt.x);
+  const tl = Math.hypot(tilt.x, tilt.y), ta = Math.atan2(tilt.y, tilt.x) - view.r;
   const out = [];
   for (let i = tips.length - 1; i >= 0; i--) {
     const t = tips[i];
@@ -1819,9 +1828,46 @@ function fitView(){
   let l = 24, r = 24, t = 24, b = 24;
   if (!isNarrow()) { if (!$('#props').hidden) l = 260; if (!$('#layers').hidden || !$('#settings').hidden || !$('#tilt').hidden) r = 276; }
   const aw = Math.max(50, stageRect.width - l - r), ah = Math.max(50, stageRect.height - t - b);
-  const z = Math.min(aw / doc.w, ah / doc.h);
-  view.z = z; view.x = l + (aw - doc.w * z) / 2; view.y = t + (ah - doc.h * z) / 2;
+  // fit the turned paper's bounding box, centred in the free area
+  const ac = Math.abs(Math.cos(view.r)), as = Math.abs(Math.sin(view.r));
+  const z = Math.min(aw / (doc.w * ac + doc.h * as), ah / (doc.w * as + doc.h * ac));
+  const m = rotV(doc.w / 2 * z, doc.h / 2 * z, view.r);
+  view.z = z; view.x = l + aw / 2 - m.x; view.y = t + ah / 2 - m.y;
   updateZoomUI(); dirty = true;
+}
+/* ---- turning the paper on the screen ---- */
+const rotV = (x, y, a) => ({ x: x * Math.cos(a) - y * Math.sin(a), y: x * Math.sin(a) + y * Math.cos(a) });
+const normA = a => { a = (a + Math.PI) % (2 * Math.PI); if (a < 0) a += 2 * Math.PI; return a - Math.PI; };
+// turn by da radians about the screen point cx, cy
+function rotateView(da, cx, cy){
+  const o = rotV(view.x - cx, view.y - cy, da);
+  view.x = cx + o.x; view.y = cy + o.y; view.r = normA(view.r + da);
+  if (Math.abs(view.r) < 1e-6) view.r = 0;
+  updateRotUI(); dirty = true;
+}
+let rotAnim = 0;
+// ease to an angle about the middle of the stage
+function turnTo(target){
+  cancelAnimationFrame(rotAnim);
+  const cx = stageRect.width / 2, cy = stageRect.height / 2, d = normA(target - view.r);
+  const settle = () => { view.r = Math.abs(normA(target)) < 1e-6 ? 0 : normA(target); updateRotUI(); };
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { rotateView(d, cx, cy); settle(); return; }
+  const t0 = performance.now(); let done = 0;
+  const step = now => {
+    const k = Math.min(1, (now - t0) / 180), e = 1 - Math.pow(1 - k, 3);
+    rotateView(d * e - done, cx, cy); done = d * e;
+    if (k < 1) rotAnim = requestAnimationFrame(step); else settle();
+  };
+  rotAnim = requestAnimationFrame(step);
+}
+const ROT_STEP = Math.PI / 12;   // 15 degrees
+function turnStep(dir){ turnTo((Math.round(view.r / ROT_STEP) + dir) * ROT_STEP); }
+function updateRotUI(){
+  const deg = Math.round(view.r * 180 / Math.PI), b = $('#rotBtn');
+  b.hidden = deg === 0;
+  $('#rotText').textContent = Math.abs(deg) + '°';
+  $('#rotIcon').style.transform = `rotate(${view.r}rad)`;
+  b.title = `回転を戻す（いま${deg > 0 ? '右' : '左'}に${Math.abs(deg)}°）`; b.setAttribute('aria-label', b.title);
 }
 function zoomAt(cx, cy, f){
   const z = clamp(view.z * f, .05, 16);
@@ -1840,7 +1886,7 @@ function composite(){
   gl.disable(gl.BLEND); target(null);
   const pp = PAPERS[S.paper];
   const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
-    u_doc:[doc.w, doc.h], u_canvas:[canvas.width, canvas.height], u_view:[view.x * DPR, view.y * DPR, view.z * DPR], u_export:0 };
+    u_doc:[doc.w, doc.h], u_canvas:[canvas.width, canvas.height], u_view:[view.x * DPR, view.y * DPR, view.z * DPR], u_rot:[Math.cos(view.r), Math.sin(view.r)], u_export:0 };
   const op = new Float32Array(8);
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = L && L.visible ? L.opacity : 0; }
   U.u_op = op;
@@ -1854,7 +1900,7 @@ const pointers = new Map();
 let gesture = null, panDrag = null, spaceDown = false, penSeen = false, lastSpeed = 0, lastEvt = null;
 const cursorEl = $('#cursor');
 
-function toDoc(cx, cy){ return { x:(cx - stageRect.left - view.x) / view.z, y:(cy - stageRect.top - view.y) / view.z }; }
+function toDoc(cx, cy){ return rotV((cx - stageRect.left - view.x) / view.z, (cy - stageRect.top - view.y) / view.z, -view.r); }
 function readPoint(ev){
   const d = toDoc(ev.clientX, ev.clientY);
   let p;
@@ -1877,6 +1923,7 @@ function readPoint(ev){
   const tl = Math.hypot(tx, ty);
   const tiltAmt = clamp((tl - .35) / .5, 0, 1);
   if (tl > 0) { tx = tx / tl * tiltAmt; ty = ty / tl * tiltAmt; }
+  if (view.r && (tx || ty)) { const t = rotV(tx, ty, -view.r); tx = t.x; ty = t.y; }   // the pen leans on the screen; the paper may be turned
   if (stroke) { stroke.pSm = lerp(stroke.pSm, p, ev.pointerType === 'pen' ? .6 : .3); p = stroke.pSm; }
   const tw = ev.pointerType === 'pen' && ev.twist ? ev.twist : 0;
   return { x:d.x, y:d.y, p, tx, ty, tw };
@@ -1885,8 +1932,11 @@ function gestureBase(){
   const pts = [...pointers.values()];
   const c = pts.reduce((a, p) => ({ x:a.x + p.x / pts.length, y:a.y + p.y / pts.length }), { x:0, y:0 });
   const d = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
-  gesture = { c, d, v:{ ...view } };
+  const a = pts.length > 1 ? Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) : 0;
+  cancelAnimationFrame(rotAnim);
+  gesture = { c, d, a, rot:false, off:0, v:{ ...view } };
 }
+const ROT_START = 12 * Math.PI / 180, ROT_SNAP = 6 * Math.PI / 180;
 function gestureMove(){
   const pts = [...pointers.values()]; if (!pts.length || !gesture) return;
   const c = pts.reduce((a, p) => ({ x:a.x + p.x / pts.length, y:a.y + p.y / pts.length }), { x:0, y:0 });
@@ -1894,8 +1944,20 @@ function gestureMove(){
   const g = gesture, v0 = g.v;
   const z = (g.d > 0 && d > 0) ? clamp(v0.z * d / g.d, .05, 16) : v0.z;
   const lx = c.x - stageRect.left, ly = c.y - stageRect.top, gx = g.c.x - stageRect.left, gy = g.c.y - stageRect.top;
-  const dx = (gx - v0.x) / v0.z, dy = (gy - v0.y) / v0.z;
-  view.z = z; view.x = lx - dx * z; view.y = ly - dy * z; updateZoomUI(); dirty = true;
+  // a twist only starts turning the paper past a small angle (so pinching never turns it by accident), and it settles on upright / quarter turns
+  let r = v0.r;
+  if (pts.length > 1 && g.d > 0) {
+    const da = normA(Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) - g.a);
+    if (!g.rot && Math.abs(da) > ROT_START) {
+      g.rot = true; g.off = Math.sign(da) * ROT_START;
+      if (!tipShown('rotate')) { store.set('tip:rotate', true); toast('2本指でひねると紙が回ります。上の角度のボタンで元に戻せます'); }
+    }
+    // once turning, the paper soon catches up with the fingers
+    if (g.rot) { g.off *= .82; r = v0.r + da - g.off; const q = Math.round(r / (Math.PI / 2)) * (Math.PI / 2); if (Math.abs(r - q) < ROT_SNAP) r = q; }
+  }
+  const o = rotV(v0.x - gx, v0.y - gy, normA(r - v0.r)), k = z / v0.z;
+  view.z = z; view.x = lx + o.x * k; view.y = ly + o.y * k; view.r = normA(r); if (Math.abs(view.r) < 1e-6) view.r = 0;
+  updateZoomUI(); updateRotUI(); dirty = true;
 }
 function showCursor(ev){
   if (ev.pointerType === 'touch' || panDrag || spaceDown || handMode) { cursorEl.style.display = 'none'; return; }
@@ -1925,6 +1987,8 @@ canvas.addEventListener('pointerdown', e => {
   if (!isNarrow() && !$('#settings').hidden) { /* keep */ }
   if (e.pointerType === 'touch') {
     pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    if (pointers.size === 1) tap = { t0:performance.now(), n:1, moved:0, start:new Map(), v:{ ...view } };
+    if (tap) { tap.n = Math.max(tap.n, pointers.size); tap.start.set(e.pointerId, { x:e.clientX, y:e.clientY }); }
     if (pointers.size >= 2) {
       if (stroke && stroke.ptype === 'touch') { if (performance.now() - stroke.t0 < 350 || (stroke.distTotal || 0) < 30 / view.z) cancelStroke(); else endStroke(); }
       gestureBase(); return;
@@ -1947,6 +2011,7 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('pointermove', e => {
   if (e.pointerType === 'touch' && pointers.has(e.pointerId)) {
     pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    if (tap && tap.start.has(e.pointerId)) { const s0 = tap.start.get(e.pointerId); tap.moved = Math.max(tap.moved, Math.hypot(e.clientX - s0.x, e.clientY - s0.y)); }
     if (gesture) { gestureMove(); return; }
   }
   if (panDrag && e.pointerId === panDrag.id) { view.x = panDrag.vx + e.clientX - panDrag.x; view.y = panDrag.vy + e.clientY - panDrag.y; dirty = true; return; }
@@ -1959,10 +2024,29 @@ canvas.addEventListener('pointermove', e => {
     if (Math.hypot(e.clientX - stroke.holdAt.x, e.clientY - stroke.holdAt.y) > 4) { stroke.holdAt = { x:e.clientX, y:e.clientY }; stroke.holdT = stroke.lastMoveT; }
   }
 });
+let tap = null, lastTap = null;
+// a quick tap with fingers (short, barely moving) is a shortcut, not a gesture
+function fingerTap(e){
+  if (!tap || pointers.size) return;
+  const t = tap, now = performance.now(); tap = null;
+  if (now - t.t0 > 320 || t.moved > 14) { lastTap = null; return; }
+  if (t.n >= 2) {
+    Object.assign(view, t.v); updateZoomUI(); updateRotUI(); dirty = true;   // put back the hair of pinch the tap made
+    if (t.n >= 3) { if (redoStack.length) { redo(); toast('やり直しました（3本指タップ）'); } }
+    else if (undoStack.length) { undo(); toast('1つ戻しました（2本指タップ）'); }
+    lastTap = null; return;
+  }
+  // one finger only taps when fingers do not draw (pen only, or the hand tool)
+  if (!(S.penOnly || handMode)) return;
+  if (lastTap && now - lastTap.t < 330 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) {
+    lastTap = null; if (undoStack.length) { undo(); toast('1つ戻しました（ダブルタップ）'); }
+  } else lastTap = { t:now, x:e.clientX, y:e.clientY };
+}
 function pointerEnd(e){
   if (e.pointerType === 'touch') {
     pointers.delete(e.pointerId);
     if (gesture) { if (pointers.size) gestureBase(); else gesture = null; }
+    fingerTap(e);
   }
   if (panDrag && e.pointerId === panDrag.id) { panDrag = null; canvas.classList.remove('grabbing'); }
   if (stroke && e.pointerId === stroke.pid) endStroke();
@@ -1993,6 +2077,7 @@ window.addEventListener('keydown', e => {
   if (k === '[' || k === ']') { const ts = S.tools[S.tool], T = TOOLS[S.tool]; ts.size = clamp(Math.round(ts.size * (k === ']' ? 1.15 : 1 / 1.15) + (k === ']' ? 1 : -1) * .5), T.min, T.max); syncProps(); saveSettings(); return; }
   if (k === '0') { fitView(); return; }
   if (k === 'h') { setHand(!handMode); return; }
+  if (k === 'r') { turnStep(e.shiftKey ? -1 : 1); return; }
   if (k === '+' || k === '=' || k === ';') { zoomStep(1.25); return; }
   if (k === '-') { zoomStep(.8); return; }
   if (k === 'd') { dryNow(); return; }
@@ -2408,6 +2493,9 @@ $('#dryBtn').addEventListener('click', dryNow);
 $('#zoomBtn').addEventListener('click', fitView);
 $('#handBtn').addEventListener('click', () => { setHand(!handMode); if (handMode) toast('手のひら：ペンでドラッグすると紙が動きます。道具を選ぶと描く状態に戻ります'); });
 $('#zoomIn').addEventListener('click', () => zoomStep(1.25));
+$('#rotL').addEventListener('click', () => turnStep(-1));
+$('#rotR').addEventListener('click', () => turnStep(1));
+$('#rotBtn').addEventListener('click', () => turnTo(0));
 $('#zoomOut').addEventListener('click', () => zoomStep(.8));
 $('#layBtn').addEventListener('click', () => togglePanel('layers'));
 $('#setBtn').addEventListener('click', () => togglePanel('settings'));
@@ -2484,7 +2572,7 @@ $('#saveBtn').addEventListener('click', () => {
   gl.disable(gl.BLEND); target(f);
   const pp = PAPERS[S.paper];
   const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
-    u_doc:[doc.w, doc.h], u_canvas:[doc.w, doc.h], u_view:[0, 0, 1], u_export:1 };
+    u_doc:[doc.w, doc.h], u_canvas:[doc.w, doc.h], u_view:[0, 0, 1], u_rot:[1, 0], u_export:1 };
   const op = new Float32Array(8);
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = L && L.visible ? L.opacity : 0; }
   U.u_op = op; U.u_wetOp = simOwner ? (simOwner.visible ? simOwner.opacity : 0) : 1;
@@ -2565,7 +2653,7 @@ function thumbnail(){
   gl.disable(gl.BLEND); target(f);
   const pp = PAPERS[S.paper];
   const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
-    u_doc:[doc.w, doc.h], u_canvas:[tw, th], u_view:[0, 0, sc], u_export:1, u_gouache:GOUACHE_WHITE,
+    u_doc:[doc.w, doc.h], u_canvas:[tw, th], u_view:[0, 0, sc], u_rot:[1, 0], u_export:1, u_gouache:GOUACHE_WHITE,
     u_wetIdx: simOwner ? layers.indexOf(simOwner) : -1, u_wetOp: simOwner ? (simOwner.visible ? simOwner.opacity : 0) : 1 };
   const op = new Float32Array(8);
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = L && L.visible ? L.opacity : 0; }
