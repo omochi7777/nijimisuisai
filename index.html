@@ -139,6 +139,26 @@ button,input,select{font:inherit;color:inherit}
 .setchips button i{display:flex;width:28px;height:14px;border-radius:7px;overflow:hidden}
 .setchips button i b{flex:1}
 .setchips button[aria-pressed="true"]{border-color:var(--accent);background:var(--active);font-weight:700}
+.setchips button svg{width:15px;height:15px;color:#d9a400;fill:currentColor}
+#favBtn[aria-pressed="true"]{color:#d9a400;border-color:#d9a400}
+#favBtn[aria-pressed="true"] svg{fill:currentColor}
+#favEmpty{margin-top:-4px}
+/* making a colour: wheel, sliders, mixing palette */
+.mk{display:flex;flex-direction:column;gap:8px}
+/* what you are making, right above the wheel or sliders: the colour you started from (tap to go back) and the colour now */
+.mkprev{display:flex;flex:none;height:38px;border-radius:11px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)}
+.mkprev button{flex:0 0 36%;border:0;margin:0;padding:0 9px;cursor:pointer;display:flex;align-items:center;justify-content:flex-start;font:inherit}
+.mkprev button:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.mkprev span{flex:1;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 10px}
+.mkprev small{font-size:11px;font-weight:500;letter-spacing:.02em}
+.mkprev .hx{font-family:var(--font-mono);font-size:11.5px}
+#wheel{display:block;width:min(100%,232px);aspect-ratio:1;align-self:center;touch-action:none;cursor:crosshair}
+.hsv input[type=range]{-webkit-appearance:none;appearance:none;height:14px;border-radius:7px;background:var(--line);margin:0}
+.hsv input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,.55);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.hsv input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,.55)}
+.hsv input[type=range]::-moz-range-track{background:transparent}
+#hexIn{height:30px;width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:0 8px;font-family:var(--font-mono);font-size:12.5px;-webkit-user-select:text;user-select:text}
+#hexIn:invalid,#hexIn.bad{border-color:var(--warn)}
 
 /* first-time hint bubble */
 #coach{position:fixed;z-index:45;width:min(300px,calc(100vw - 24px));box-sizing:border-box;padding:14px 14px 12px;background-color:var(--panel);background-image:var(--grain);border:1.5px solid var(--accent);border-radius:16px;box-shadow:0 12px 34px rgba(60,45,25,.25);display:flex;flex-direction:column;gap:6px;animation:pop .25s ease-out}
@@ -437,16 +457,34 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <div class="colorcur">
         <span class="swbig" id="swCur"></span>
         <span class="cn"><b id="colorName">ウルトラマリン</b><small id="colorMeta">粒状性 強</small></span>
-        <input type="color" id="colorPick" title="好きな色を作る" aria-label="好きな色を作る">
+        <button class="btn icon" id="favBtn" aria-pressed="false" title="お気に入りに登録" aria-label="お気に入りに登録"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3.5 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></button>
+        <input type="color" id="colorPick" title="ブラウザの色選びで作る" aria-label="ブラウザの色選びで色を作る">
       </div>
       <p class="hint" id="colorNote" hidden></p>
       <div class="setchips" id="setChips" aria-label="色のセット"></div>
       <div class="swgrid" id="swatches"></div>
+      <p class="hint" id="favEmpty" hidden>まだ登録された色はありません。色を選んで、上の ☆ を押すとここに並びます。</p>
+      <div id="recentWrap" hidden><p class="sublabel">最近使った色</p><div class="swgrid" id="recent" style="margin-top:10px"></div></div>
       <div class="divider"></div>
-      <div class="ph"><span class="ptitle">パレット</span><button class="btn" id="palWash" style="height:28px;font-size:12px">洗う</button></div>
-      <canvas id="palette" aria-label="混色パレット"></canvas>
-      <div class="seg" id="palSeg"><button data-m="put">置く</button><button data-m="mix">混ぜる</button><button data-m="pick">筆に取る</button></div>
-      <p class="hint" id="palHint">上の色を選んで「置く」、別の色も置いて「混ぜる」、できた色を「筆に取る」で使えます。</p>
+      <div class="ph"><span class="ptitle">色を作る</span></div>
+      <div class="seg" id="mkSeg"><button data-m="wheel">サークル</button><button data-m="slider">スライダー</button><button data-m="mix">混色パレット</button></div>
+      <div class="mkprev" id="mkPrev"><button id="mkWas" title="元の色に戻す" aria-label="元の色に戻す"><small>元の色</small></button><span id="mkNow"><small>今の色</small><small class="hx" id="mkNowHex"></small></span></div>
+      <div id="mkWheel" class="mk">
+        <canvas id="wheel" aria-label="カラーサークル：外側の輪で色相、内側の四角で鮮やかさ（横）と明るさ（縦）"></canvas>
+        <p class="hint">外側の輪で色合い、内側の四角で鮮やかさ（横）と明るさ（縦）を選びます。</p>
+      </div>
+      <div id="mkSlider" class="mk">
+        <div class="row hsv"><label for="hsvH">色相</label><input id="hsvH" type="range" min="0" max="359" step="1"><output id="hsvHV"></output></div>
+        <div class="row hsv"><label for="hsvS">鮮やかさ</label><input id="hsvS" type="range" min="0" max="100" step="1"><output id="hsvSV"></output></div>
+        <div class="row hsv"><label for="hsvV">明るさ</label><input id="hsvV" type="range" min="0" max="100" step="1"><output id="hsvVV"></output></div>
+        <div class="row"><label for="hexIn">色コード</label><input id="hexIn" type="text" maxlength="7" spellcheck="false" autocomplete="off" placeholder="#2A3F9D" aria-label="色コード（#から始まる6桁）"><span></span></div>
+      </div>
+      <div id="mkMix" class="mk">
+        <div class="ph"><span class="hint">絵の具を置いて混ぜる</span><button class="btn" id="palWash" style="height:28px;font-size:12px">洗う</button></div>
+        <canvas id="palette" aria-label="混色パレット"></canvas>
+        <div class="seg" id="palSeg"><button data-m="put">置く</button><button data-m="mix">混ぜる</button><button data-m="pick">筆に取る</button></div>
+        <p class="hint" id="palHint">上の色を選んで「置く」、別の色も置いて「混ぜる」、できた色を「筆に取る」で使えます。</p>
+      </div>
     </aside>
 
     <button id="noteBtn" aria-expanded="false" aria-controls="note" title="技法ノート：画材と技法の説明（N）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10 5 7.2 4.5 3.5 5v13c3.7-.5 6.5 0 8.5 1.5 2-1.5 4.8-2 8.5-1.5V5c-3.7-.5-6.5 0-8.5 1.5z"/><path d="M12 6.5v13"/><path d="M6 8.6c1.3 0 2.5.2 3.6.7M6 11.6c1.3 0 2.5.2 3.6.7" opacity=".6"/></svg><span>ノート</span></button>
@@ -1250,12 +1288,16 @@ const store = {
 const S = Object.assign({
   tool:'brush', paper:'cold', colorSet:'classic', vein:140, bleed:100, drySpd:100, gran:100, curve:100, stab:2, penOnly:false, runout:true,
   grade:'HB', pigment:6, custom:null,
+  recent:[], favs:[], showFav:false, mkMode:'wheel',   // recently used colours, favourite colours, how to make a new colour
   tools:{},
 }, store.get('settings', {}));
 for (const k in TOOLS) S.tools[k] = Object.assign({ size:TOOLS[k].size, conc:TOOLS[k].conc, water:TOOLS[k].water, strength:TOOLS[k].strength, angle:TOOLS[k].angle, shape:TOOLS[k].shape, scratch:TOOLS[k].scratch, mix:TOOLS[k].mix }, S.tools[k] || {});
 if (!TOOLS[S.tool]) S.tool = 'brush';
 if (!PAPERS[S.paper]) S.paper = 'cold';
 if (!COLOR_SETS[S.colorSet]) S.colorSet = 'classic';
+if (!Array.isArray(S.recent)) S.recent = [];
+if (!Array.isArray(S.favs)) S.favs = [];
+if (!['wheel', 'slider', 'mix'].includes(S.mkMode)) S.mkMode = 'wheel';
 PIGMENTS = COLOR_SETS[S.colorSet].colors.concat([WHITE_GOUACHE]);
 let saveT = 0; function saveSettings(){ clearTimeout(saveT); saveT = setTimeout(() => store.set('settings', S), 300); }
 
@@ -1495,6 +1537,7 @@ function beginStroke(e, pt){
   const layerSnap = T.target !== 'sim';
   if (layerSnap) blit(active.fbo, backupF, 0, 0, doc.w, doc.h, 0, 0);
   qInfo = streamInfo(tool);
+  if (toolUsesColor(tool, S.grade)) rememberColor();
   if (WET.includes(tool) && tool !== 'water' && S.vein > 0) readWetMap();
   stroke = { pid:e.pointerId, ptype:e.pointerType, tool, parts, layerSnap, layer:active, seed:qInfo.seed,
     bbox:[1e9, 1e9, -1e9, -1e9], last:pt, sm:{ x:pt.x, y:pt.y }, carry:0, res:1, dist:0, t0:performance.now(), lastDabT:performance.now(),
@@ -2187,16 +2230,23 @@ function syncProps(){
   $('#swCur').style.background = col.hex; $('#colorName').textContent = col.name;
   $('#colorMeta').textContent = (col.white ? '白（水彩では色を淡くします）' : '粒状性 ' + (col.gran > .6 ? '強' : col.gran > .25 ? '中' : '弱')) + ' · ' + col.hex.toUpperCase();
   $('#colorPick').value = col.hex;
-  const usesColor = ['gpen', 'calli', 'fpen', 'brush', 'flat', 'sumi', 'drop', 'gouache'].includes(t) || (t === 'pencil' && S.grade === '色');
+  const usesColor = toolUsesColor(t, S.grade);
   $('#chipDot').style.background = col.hex; $('#chipName').textContent = col.name;
   $('#colorChip').classList.toggle('muted', !usesColor);
   $('#colorChip').title = usesColor ? `色とパレット（${col.name}）` : `色とパレット（${T.label}は色を使いません）`;
   const note = $('#colorNote');
   note.hidden = usesColor;
   note.textContent = t === 'pencil' ? '鉛筆で色を使うには、芯の硬さで「色」を選んでください。' : `${T.label}は色を使いません。色は筆・ペン・しずく・ガッシュで使えます。`;
-  $$('.sw').forEach(b => b.setAttribute('aria-pressed', !S.custom && +b.dataset.i === S.pigment));
+  const curHex = col.hex.toLowerCase(), isFav = S.favs.some(f => f.hex === curHex);
+  $$('.sw').forEach(b => b.setAttribute('aria-pressed', b.dataset.hex ? b.dataset.hex === curHex : (!S.custom && +b.dataset.i === S.pigment)));
+  $('#favBtn').setAttribute('aria-pressed', String(isFav));
+  $('#favBtn').title = isFav ? 'お気に入りから外す' : 'お気に入りに登録'; $('#favBtn').setAttribute('aria-label', $('#favBtn').title);
+  $$('#mkSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === S.mkMode));
+  ['wheel', 'slider', 'mix'].forEach(m => { $('#mk' + m[0].toUpperCase() + m.slice(1)).hidden = S.mkMode !== m; });
+  $('#mkPrev').hidden = S.mkMode === 'mix';
+  syncMaker();
   $$('#palSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === palMode));
-  $$('#setChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === S.colorSet));
+  $$('#setChips button').forEach(b => b.setAttribute('aria-pressed', S.showFav ? b.dataset.k === 'fav' : b.dataset.k === S.colorSet));
 }
 function bindRange(id, get, set, fmt){
   const el = $('#' + id), out = $('#' + id + 'V');
@@ -2223,19 +2273,169 @@ function buildProps(){
     const set = COLOR_SETS[k], b = document.createElement('button'); b.dataset.k = k;
     const pick = [0, 4, 7, 11].map(i => set.colors[Math.min(i, set.colors.length - 1)].hex);
     b.innerHTML = `<i>${pick.map(h => `<b style="background:${h}"></b>`).join('')}</i>${set.label}`;
-    b.addEventListener('click', () => { S.colorSet = k; PIGMENTS = set.colors.concat([WHITE_GOUACHE]); if (!S.custom) S.pigment = 0; saveSettings(); buildSwatches(); syncProps(); });
+    b.addEventListener('click', () => { S.colorSet = k; S.showFav = false; PIGMENTS = set.colors.concat([WHITE_GOUACHE]); if (!S.custom) S.pigment = 0; saveSettings(); buildSwatches(); syncProps(); });
     sc.appendChild(b);
   }
-  $('#colorPick').addEventListener('input', e => { S.custom = e.target.value; S.customName = null; S.customGran = .3; S.customWhite = false; saveSettings(); syncProps(); });
+  // the favourite colours sit with the sets, as one more set of your own
+  const fb = document.createElement('button'); fb.dataset.k = 'fav'; fb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3.5 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>お気に入り';
+  fb.addEventListener('click', () => { S.showFav = true; saveSettings(); buildSwatches(); syncProps(); });
+  sc.appendChild(fb); placeFavChip();
+  $('#favBtn').addEventListener('click', toggleFav);
+  renderRecent();
+  buildMaker();
+  $('#colorPick').addEventListener('input', e => setHexColor(e.target.value));
   buildPalette();
 }
 function buildSwatches(){
   const sw = $('#swatches'); sw.innerHTML = '';
-  PIGMENTS.forEach((pg, i) => {
+  if (S.showFav) S.favs.forEach(c => sw.appendChild(colorButton(c)));
+  else PIGMENTS.forEach((pg, i) => {
     const b = document.createElement('button'); b.className = 'sw'; b.dataset.i = i; b.style.background = pg.hex; b.title = pg.name; b.setAttribute('aria-label', pg.name);
     b.addEventListener('click', () => { S.pigment = i; S.custom = null; saveSettings(); syncProps(); });
     sw.appendChild(b);
   });
+  $('#favEmpty').hidden = !(S.showFav && !S.favs.length);
+}
+/* ---- colours as small records: recent and favourite colours keep their name and how they granulate ---- */
+const COLOR_TOOLS = ['gpen', 'calli', 'fpen', 'brush', 'flat', 'sumi', 'drop', 'gouache'];
+const toolUsesColor = (t, grade) => COLOR_TOOLS.includes(t) || (t === 'pencil' && grade === '色');
+const colorEntry = c => ({ name:c.name, hex:c.hex.toLowerCase(), gran:c.gran != null ? c.gran : .3, white:!!c.white });
+function colorButton(c){
+  const b = document.createElement('button'); b.className = 'sw'; b.dataset.hex = c.hex; b.style.background = c.hex;
+  b.title = `${c.name}（${c.hex.toUpperCase()}）`; b.setAttribute('aria-label', c.name);
+  b.addEventListener('click', () => pickColor(c));
+  return b;
+}
+// choose a recorded colour: if the open set has it, select it there; otherwise as your own colour
+function pickColor(c){
+  const i = PIGMENTS.findIndex(pg => pg.hex.toLowerCase() === c.hex);
+  if (i >= 0) { S.pigment = i; S.custom = null; }
+  else { S.custom = c.hex; S.customName = c.name; S.customGran = c.gran; S.customWhite = c.white; }
+  saveSettings(); syncProps();
+}
+const RECENT_N = 6;
+function rememberColor(){
+  const c = colorEntry(currentColor());
+  if (S.recent[0] && S.recent[0].hex === c.hex) return;
+  S.recent = [c, ...S.recent.filter(x => x.hex !== c.hex)].slice(0, RECENT_N);
+  saveSettings(); renderRecent();
+}
+function renderRecent(){
+  const box = $('#recent'); box.innerHTML = '';
+  S.recent.forEach(c => box.appendChild(colorButton(c)));
+  $('#recentWrap').hidden = !S.recent.length;
+  const curHex = currentColor().hex.toLowerCase();
+  box.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.hex === curHex)));
+}
+function toggleFav(){
+  const c = colorEntry(currentColor()), i = S.favs.findIndex(f => f.hex === c.hex);
+  if (i >= 0) { S.favs.splice(i, 1); toast(`「${c.name}」をお気に入りから外しました`); }
+  else if (S.favs.length >= 36) { toast('お気に入りは36色までです'); return; }
+  else { S.favs.push(c); toast(`「${c.name}」をお気に入りに登録しました`); }
+  saveSettings(); placeFavChip(); if (S.showFav) buildSwatches(); syncProps();
+}
+// with at least one favourite, its chip leads the row (on a phone the row scrolls, and the end is out of sight)
+function placeFavChip(){
+  const sc = $('#setChips'), fb = sc.querySelector('[data-k="fav"]'); if (!fb) return;
+  const front = S.favs.length > 0;
+  if (front && sc.firstElementChild !== fb) { sc.prepend(fb); sc.scrollLeft = 0; }
+  else if (!front && sc.lastElementChild !== fb) sc.append(fb);
+}
+// any colour you make yourself (wheel, sliders, colour code, the browser's picker)
+function setHexColor(hex){
+  hex = hex.toLowerCase(); const [r, g, b] = hexRgb(hex), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  S.custom = hex; S.customName = '自分で作った色'; S.customGran = .3; S.customWhite = mx > .96 && mx - mn < .05;   // near white behaves like white paint
+  saveSettings(); syncProps();
+}
+
+/* ================= making a colour: a wheel and sliders (hue, vividness, brightness) ================= */
+const hsv2rgb = (h, s, v) => { const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return [f(5), f(3), f(1)]; };
+const rgb2hsv = ([r, g, b]) => { const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b); let h = 0;
+  if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+  return [h, mx ? d / mx : 0, mx]; };
+const rgbHex = rgb => '#' + rgb.map(v => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, '0')).join('');
+let mk = { h:220, s:0, v:0, hex:null };
+// mkWas: the colour before you started making one (any change that does not come from the wheel / sliders / code resets it)
+let mkWas = null, mkSelf = false, mkSeen = null;
+const inkOn = hex => { const [r, g, b] = hexRgb(hex); return .299 * r + .587 * g + .114 * b > .6 ? 'rgba(0,0,0,.72)' : 'rgba(255,255,255,.9)'; };
+function syncMaker(){
+  const hex = currentColor().hex.toLowerCase();
+  if (hex !== mk.hex) { const [h, s, v] = rgb2hsv(hexRgb(hex)); mk = { h: s > .01 && v > .01 ? h : mk.h, s, v, hex }; }   // greys keep the last hue
+  if (!mkWas || (!mkSelf && hex !== mkSeen)) mkWas = colorEntry(currentColor());   // only a colour change from elsewhere starts afresh
+  mkSeen = hex;
+  const was = $('#mkWas'), now = $('#mkNow');
+  was.style.background = mkWas.hex; was.style.color = inkOn(mkWas.hex); was.title = `元の色に戻す（${mkWas.name}）`;
+  now.style.background = hex; now.style.color = inkOn(hex); $('#mkNowHex').textContent = hex.toUpperCase();
+  if (!$('#colorDrawer').classList.contains('open')) return;
+  if (S.mkMode === 'wheel') drawWheel(); else if (S.mkMode === 'slider') syncSliders();
+}
+function makeColor(h, s, v){
+  const hex = rgbHex(hsv2rgb(h, s, v));
+  mk = { h, s, v, hex };
+  mkSelf = true; setHexColor(hex); mkSelf = false;
+}
+const wheel = $('#wheel'), wctx = wheel.getContext('2d');
+let ringImg = null, wheelDrag = null;
+// sizes in the wheel's own pixels: ring outside, square inside
+const wheelGeom = W => { const c = W / 2, R = c - W * .01, ri = R - W * .075; return { c, R, ri, half: ri * .69 }; };
+function drawWheel(){
+  const rect = wheel.getBoundingClientRect(); if (!rect.width) return;
+  const W = Math.round(rect.width * Math.min(devicePixelRatio || 1, 2));
+  if (wheel.width !== W) { wheel.width = wheel.height = W; ringImg = null; }
+  const { c, R, ri, half } = wheelGeom(W);
+  if (!ringImg) {
+    ringImg = document.createElement('canvas'); ringImg.width = ringImg.height = W;
+    const g = ringImg.getContext('2d'); g.lineWidth = R - ri;
+    for (let d = 0; d < 360; d++) { g.strokeStyle = `hsl(${d},100%,50%)`; g.beginPath(); g.arc(c, c, (R + ri) / 2, (d - 90.7) * Math.PI / 180, (d - 89.3) * Math.PI / 180); g.stroke(); }
+  }
+  wctx.clearRect(0, 0, W, W); wctx.drawImage(ringImg, 0, 0);
+  const x0 = c - half, sz = half * 2;
+  wctx.fillStyle = rgbHex(hsv2rgb(mk.h, 1, 1)); wctx.fillRect(x0, x0, sz, sz);
+  let gr = wctx.createLinearGradient(x0, 0, x0 + sz, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(1, 'rgba(255,255,255,0)'); wctx.fillStyle = gr; wctx.fillRect(x0, x0, sz, sz);
+  gr = wctx.createLinearGradient(0, x0, 0, x0 + sz); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, '#000'); wctx.fillStyle = gr; wctx.fillRect(x0, x0, sz, sz);
+  const mark = (x, y) => { wctx.lineWidth = W * .012; wctx.strokeStyle = 'rgba(0,0,0,.6)'; wctx.beginPath(); wctx.arc(x, y, W * .032, 0, Math.PI * 2); wctx.stroke(); wctx.lineWidth = W * .008; wctx.strokeStyle = '#fff'; wctx.stroke(); };
+  const a = (mk.h - 90) * Math.PI / 180;
+  mark(c + Math.cos(a) * (R + ri) / 2, c + Math.sin(a) * (R + ri) / 2);
+  mark(x0 + mk.s * sz, x0 + (1 - mk.v) * sz);
+}
+function wheelAt(e, start){
+  const rect = wheel.getBoundingClientRect(), W = rect.width, { c, ri, half } = wheelGeom(W);
+  const x = e.clientX - rect.left - c, y = e.clientY - rect.top - c, d = Math.hypot(x, y);
+  if (start) wheelDrag.part = d >= ri - 4 ? 'ring' : (Math.abs(x) <= half + 6 && Math.abs(y) <= half + 6 ? 'sv' : null);
+  if (wheelDrag.part === 'ring') {
+    let h = Math.atan2(y, x) * 180 / Math.PI + 90; if (h < 0) h += 360;
+    makeColor(h, mk.s < .05 ? .75 : mk.s, mk.v < .05 ? .75 : mk.v);   // a grey picks up colour when you choose a hue
+  } else if (wheelDrag.part === 'sv') makeColor(mk.h, clamp((x + half) / (2 * half), 0, 1), clamp(1 - (y + half) / (2 * half), 0, 1));
+}
+function syncSliders(){
+  const { h, s, v } = mk;
+  $('#hsvH').value = Math.round(h); $('#hsvS').value = Math.round(s * 100); $('#hsvV').value = Math.round(v * 100);
+  $('#hsvHV').textContent = Math.round(h) + '°'; $('#hsvSV').textContent = Math.round(s * 100) + '%'; $('#hsvVV').textContent = Math.round(v * 100) + '%';
+  // each track shows what you would get along it
+  $('#hsvH').style.background = `linear-gradient(to right,${[0, 60, 120, 180, 240, 300, 360].map(d => rgbHex(hsv2rgb(d, Math.max(s, .15), Math.max(v, .25)))).join(',')})`;
+  $('#hsvS').style.background = `linear-gradient(to right,${rgbHex(hsv2rgb(h, 0, v))},${rgbHex(hsv2rgb(h, 1, v))})`;
+  $('#hsvV').style.background = `linear-gradient(to right,#000,${rgbHex(hsv2rgb(h, s, 1))})`;
+  if (document.activeElement !== $('#hexIn')) { $('#hexIn').value = mk.hex.toUpperCase(); $('#hexIn').classList.remove('bad'); }
+}
+function buildMaker(){
+  $$('#mkSeg button').forEach(b => b.addEventListener('click', () => {
+    S.mkMode = b.dataset.m; saveSettings(); syncProps();
+    if (S.mkMode === 'mix') requestAnimationFrame(sizePalette);
+  }));
+  wheel.addEventListener('pointerdown', e => { e.preventDefault(); wheelDrag = { id:e.pointerId }; try { wheel.setPointerCapture(e.pointerId); } catch (err) {} wheelAt(e, true); });
+  wheel.addEventListener('pointermove', e => { if (wheelDrag && wheelDrag.id === e.pointerId) wheelAt(e, false); });
+  const end = e => { if (wheelDrag && wheelDrag.id === e.pointerId) wheelDrag = null; };
+  wheel.addEventListener('pointerup', end); wheel.addEventListener('pointercancel', end);
+  new ResizeObserver(() => { ringImg = null; if (S.mkMode === 'wheel') drawWheel(); }).observe(wheel);
+  const fromSliders = () => makeColor(+$('#hsvH').value, +$('#hsvS').value / 100, +$('#hsvV').value / 100);
+  ['hsvH', 'hsvS', 'hsvV'].forEach(id => $('#' + id).addEventListener('input', fromSliders));
+  $('#hexIn').addEventListener('input', e => {
+    let v = e.target.value.trim(); if (v && v[0] !== '#') v = '#' + v;
+    const ok = /^#[0-9a-f]{6}$/i.test(v); e.target.classList.toggle('bad', !ok && v.length > 1);
+    if (ok) { mkSelf = true; setHexColor(v); mkSelf = false; }
+  });
+  $('#hexIn').addEventListener('blur', () => syncSliders());
+  $('#mkWas').addEventListener('click', () => { if (mkWas) pickColor(mkWas); });
 }
 function setVein(v){
   S.vein = v; ['vein', 'vein2'].forEach(id => { $('#' + id).value = v; $('#' + id + 'V').textContent = v + '%'; }); saveSettings();
@@ -2449,7 +2649,7 @@ function togglePanel(id, force){
 function setDrawer(open, quiet){
   const d = $('#colorDrawer'); d.classList.toggle('open', open); d.setAttribute('aria-hidden', String(!open));
   $('#colorChip').setAttribute('aria-expanded', String(open));
-  if (open) { if (isNarrow()) { ['props', 'layers', 'settings', 'tilt'].forEach(k => $('#' + k).hidden = true); if (noteOpen) setNote(false); } requestAnimationFrame(sizePalette); }
+  if (open) { if (isNarrow()) { ['props', 'layers', 'settings', 'tilt'].forEach(k => $('#' + k).hidden = true); if (noteOpen) setNote(false); } requestAnimationFrame(() => { sizePalette(); syncMaker(); }); }
   if (!quiet) syncPanelBtns();
 }
 $('#colorChip').addEventListener('click', () => setDrawer(!$('#colorDrawer').classList.contains('open')));
