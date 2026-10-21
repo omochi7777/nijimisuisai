@@ -101,7 +101,20 @@ button,input,select{font:inherit;color:inherit}
 .panel{position:absolute;z-index:5;background-color:var(--panel);background-image:var(--grain);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 26px rgba(60,45,25,.14);padding:12px;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 24px);overflow-y:auto;box-sizing:border-box}
 #props{left:12px;top:12px;width:252px}
 #palette{flex:none;width:100%;aspect-ratio:3/2;max-width:100%;border-radius:8px;border:1px solid var(--line);display:block;touch-action:none;cursor:crosshair;background:#f3f3f1}
-#layers,#settings{right:12px;top:64px;width:250px;max-height:calc(100% - 76px)}
+#layers,#settings,#tilt{right:12px;top:64px;width:250px;max-height:calc(100% - 76px)}
+/* tilt pad: drag the dot the way the water should run */
+.tiltpad{position:relative;align-self:center;width:176px;height:176px;border-radius:50%;flex:none;touch-action:none;cursor:grab;
+  background:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--wet) 10%,var(--panel)) 0,var(--panel) 72%);border:1px solid var(--line);box-shadow:inset 0 2px 8px rgba(60,45,25,.12)}
+.tiltpad:active{cursor:grabbing}
+.tiltpad:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.tiltpad .ring{position:absolute;inset:25%;border-radius:50%;border:1px dashed var(--line);pointer-events:none}
+.tiltpad .cross{position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-5px 0 0 -5px;border-radius:50%;border:1.5px solid var(--muted);pointer-events:none}
+.tiltpad svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.tiltpad .knob{position:absolute;left:50%;top:50%;transition:left .05s,top .05s;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:var(--wet);border:2px solid var(--panel);box-shadow:0 2px 6px rgba(0,0,0,.25);pointer-events:none}
+.tiltinfo{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tiltinfo span{font-size:12.5px}
+#tiltBtn .arr{width:14px;height:14px;transition:transform .2s}
+#tiltBtn.tilted{border-color:var(--wet);color:var(--wet)}
 .mclose{display:none}
 #scrim{position:absolute;inset:0;z-index:6;background:rgba(12,16,22,.26)}
 
@@ -231,6 +244,16 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
   #props,#layers,#settings{left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));max-height:calc(100% - 32px);z-index:9;
     background:color-mix(in srgb,var(--panel) 84%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 12px 40px rgba(0,0,0,.25);border-radius:14px;padding:14px 16px}
   .mclose{display:inline-flex}
+  /* the tilt pad stays small in the top-left corner, over the paper, without dimming it */
+  #tilt{left:max(8px,env(safe-area-inset-left,0px));top:8px;right:auto;width:auto;z-index:7;padding:8px 10px;gap:6px;border-radius:14px;background:color-mix(in srgb,var(--panel) 88%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+  #tilt .tiltpad{width:108px;height:108px}
+  #tilt .tiltpad .knob{width:20px;height:20px;margin:-10px 0 0 -10px}
+  #tilt #tiltHint{display:none}
+  #tilt .ptitle{font-size:13px}
+  #tilt .tiltinfo{flex-direction:column;align-items:stretch;gap:4px}
+  #tilt .tiltinfo span{font-size:11.5px;text-align:center}
+  #tilt .tiltinfo .btn{height:30px;font-size:12px}
+  #tilt .mclose{width:28px;height:28px;min-width:28px}
   .row{grid-template-columns:76px 1fr 40px;min-height:34px}
   input[type=range]{height:30px}
   .seg button{height:36px}
@@ -274,6 +297,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     </span>
     <button class="btn" id="themeBtn" title="表示の明るさ（自動・ライト・ダーク）"><span id="themeIcon"></span><span class="lbl" id="themeLbl">自動</span></button>
     <button class="btn" id="paperBtn" title="新しい紙を選ぶ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M12 10v6" stroke-linecap="round"/></svg><span class="lbl">新しい紙</span></button>
+    <button class="btn" id="tiltBtn" aria-pressed="false" title="紙の傾き：濡れた水とインクを流す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19 21 12"/><path d="M12 3.5c1.6 2.2 2.8 3.6 2.8 5a2.8 2.8 0 0 1-5.6 0c0-1.4 1.2-2.8 2.8-5z"/></svg><svg class="arr" id="tiltArr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M4 12h15M13 6l6 6-6 6"/></svg><span class="lbl">傾き</span></button>
     <button class="btn" id="setBtn" aria-pressed="false" title="紙の質感・にじみ・筆圧の設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span class="lbl">設定</span></button>
     <button class="btn" id="layBtn" aria-pressed="true" title="レイヤー"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 4 9 5-9 5-9-5z"/><path d="m3 14 9 5 9-5"/></svg><span class="lbl">レイヤー</span></button>
     <button class="btn primary" id="saveBtn" title="PNG画像として書き出す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg><span class="lbl">画像を保存</span></button>
@@ -335,6 +359,17 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <ul id="layerList"></ul>
       <button class="btn" id="clearLayer">選択中のレイヤーを白紙に戻す</button>
       <p class="hint">水彩・鉛筆・インクは透明で、重ねると下の色と混ざって深くなります（減法混色）。ガッシュは不透明なので、上のレイヤーほど手前に来ます。<span style="color:var(--wet)">●</span> は濡れた絵の具が乗っているレイヤーです。</p>
+    </section>
+
+    <section id="tilt" class="panel" aria-label="紙の傾き" hidden>
+      <div class="ph"><span class="ptitle">紙の傾き</span><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="tiltpad" id="tiltPad" role="slider" tabindex="0" aria-label="水が流れる向きと傾きの強さ（矢印キーで調整）" aria-valuemin="0" aria-valuemax="30" aria-valuenow="0" aria-valuetext="水平">
+        <i class="ring"></i><i class="cross"></i>
+        <svg viewBox="-88 -88 176 176" aria-hidden="true"><line id="tiltLine" x1="0" y1="0" x2="0" y2="0" stroke="var(--wet)" stroke-width="3" stroke-linecap="round"/></svg>
+        <b class="knob" id="tiltKnob"></b>
+      </div>
+      <div class="tiltinfo"><span id="tiltText">水平</span><button class="btn" id="tiltReset">水平に戻す</button></div>
+      <p class="hint" id="tiltHint">丸の中の点を、水を流したい方へ引っぱります。紙が濡れている間、水は低い方へ流れ続け、インクも一緒に運ばれます。たまった水はやがて乾いた紙へあふれ出し、紙の端まで来た水は流れ落ちます。矢印キーでも傾けられます。</p>
     </section>
 
     <section id="settings" class="panel" aria-label="紙と設定" hidden>
@@ -510,7 +545,8 @@ bool inside(ivec2 q){ return q.x>=0 && q.y>=0 && q.x<SZ.x && q.y<SZ.y; }
 `;
 const FS_FLUX = HEAD + NOISE + SIM_COMMON + `
 uniform sampler2D u_W, u_F;
-uniform float u_g, u_damp, u_slope, u_openB, u_openV, u_time;
+uniform float u_g, u_damp, u_slope, u_openB, u_openV, u_time, u_breach, u_film;
+uniform vec2 u_tilt;   // how much lower the paper sits one cell over in x / y (0 = lying flat)
 out vec4 o;
 void main(){
   SZ = textureSize(u_W, 0);
@@ -520,26 +556,45 @@ void main(){
   if(h < 1e-4){ o = vec4(0); return; }
   float hc = h + paperAt(c).r * u_slope;
   vec4 f = texelFetch(u_F, c, 0) * u_damp;
-  ivec2 n[4] = ivec2[4](c+ivec2(-1,0), c+ivec2(1,0), c+ivec2(0,-1), c+ivec2(0,1));
+  ivec2 offs[4] = ivec2[4](ivec2(-1,0), ivec2(1,0), ivec2(0,-1), ivec2(0,1));
   vec4 nf = vec4(0);
   for(int i=0;i<4;i++){
-    ivec2 q = n[i];
-    if(!inside(q)) continue;
+    ivec2 q = c + offs[i];
+    float tl = dot(u_tilt, vec2(offs[i]));
+    // water that reaches the low edge of a tilted sheet runs off the paper
+    if(!inside(q)){ nf[i] = tl > 0. ? max(0., f[i] + u_g * (h * .5 + tl)) : 0.; continue; }
     vec4 Wq = texelFetch(u_W, q, 0);
-    float hq = Wq.r + paperAt(q).r * u_slope;
-    bool open = Wq.r > 1e-4 || Wq.g > u_openB + u_openV * thrSrc(q);
+    float hq = Wq.r + paperAt(q).r * u_slope - tl;
+    // dry paper holds a puddle back, until enough water piles up on the downhill side and breaks through as a run
+    // (surface tension: it bulges out in a few broad tongues with rounded fronts, never uphill, never as hair-thin threads)
+    bool open = Wq.r > 1e-4;
+    if(!open){
+      bool damp = Wq.g > u_openB + u_openV * thrSrc(q);
+      if(u_breach > 50. || tl < 0.) open = damp;   // lying flat (or uphill): as always
+      // only where water has pooled deep enough (the bead at the low edge) does it spill: damp paper alone would let it creep downhill in threads
+      else if(h > u_breach * (.5 + thrSrc(q)) * (.5 + vnoise(vec2(q) * .05 + 11.3))){
+        // a straight or hollow front can move on, a narrow bulge cannot, and spreading sideways comes easier than
+        // running ahead: so the water moves as one sheet with a smooth edge instead of a comb of thin runs
+        int wetN = 0;
+        for(int y=-2;y<=2;y++) for(int x=-2;x<=2;x++){ ivec2 r = q + ivec2(x,y); if(inside(r) && texelFetch(u_W, r, 0).r > 1e-3) wetN++; }
+        open = wetN >= (tl > 0. ? 10 : 7);
+      }
+    }
     float jit = 1. + .8 * (vnoise(vec2(q) * .13 + vec2(u_time * .031, -u_time * .019)) - .5) + .3 * (hash12(vec2(q) * .731 + vec2(c) * .113 + u_time) - .5);
     jit = mix(jit, jit * (.4 + 1.6 * paperAt(q).a), clamp(u_vein * .4, 0., .8));
-    nf[i] = open ? max(0., f[i] + u_g * (hc - hq) * jit) : 0.;
+    // the jitter roughens how puddles level out; the pull of a tilt stays nearly even, or it would carve the sheet into channels
+    nf[i] = open ? max(0., f[i] + u_g * ((hc - hq - tl) * jit + tl * mix(1., jit, .2))) : 0.;
   }
   float tot = nf.x + nf.y + nf.z + nf.w;
-  if(tot > 0.) nf *= min(1., h * .45 / tot);
+  // on a tilted sheet the paper keeps a thin film where the water ran off (u_film; 0 lying flat)
+  if(tot > 0.) nf *= min(1., max(h - u_film, 0.) * .45 / tot);
   o = nf;
 }`;
 const FS_UPDATE = HEAD + NOISE + SIM_COMMON + `
 uniform sampler2D u_W, u_F, u_P, u_D;
 uniform float u_evap, u_edgeEvap, u_absorb, u_sCost, u_capK, u_delta, u_sigB, u_sigV, u_evapS;
 uniform float u_dep, u_depDry, u_desorb, u_pdiff, u_granStr, u_bloom;
+uniform float u_pdrag, u_swirl, u_thinSlow, u_time;   // tilted sheet: ink lags the water, gets stirred into eddies, thin films linger
 layout(location=0) out vec4 oW; layout(location=1) out vec4 oP; layout(location=2) out vec4 oD;
 void main(){
   SZ = textureSize(u_W, 0);
@@ -548,7 +603,7 @@ void main(){
   float h = W.r, s = W.g;
   float outF = F.x + F.y + F.z + F.w;
   float hn = h - outF;
-  vec4 Pn = P * (1. - (h > 1e-5 ? clamp(outF / h, 0., 1.) : 0.));
+  vec4 Pn = P * (1. - (h > 1e-5 ? clamp(outF / h, 0., 1.) : 0.) * u_pdrag);
   ivec2 off[4] = ivec2[4](ivec2(-1,0), ivec2(1,0), ivec2(0,-1), ivec2(0,1));
   int opp[4] = int[4](1, 0, 3, 2);
   float sigC = u_sigB + u_sigV * thrSrc(c);
@@ -559,7 +614,7 @@ void main(){
     vec4 Wq = texelFetch(u_W,q,0), Fq = texelFetch(u_F,q,0), Pq = texelFetch(u_P,q,0);
     float fin = Fq[opp[i]];
     hn += fin; finT += fin;
-    if(fin > 0. && Wq.r > 1e-5) Pn += Pq * clamp(fin / Wq.r, 0., 1.);
+    if(fin > 0. && Wq.r > 1e-5) Pn += Pq * clamp(fin / Wq.r, 0., 1.) * u_pdrag;
     if(h > 1e-4 && Wq.r > 1e-4){
       float wd = clamp(min(h, Wq.r) / .1, 0., 1.) * (.25 + .9 * vnoise(vec2(c + q) * .07 + 3.7) + .6 * vnoise(vec2(c + q) * .21 + 9.1));
       float vv = .5 * (paperAt(c).a + paperAt(q).a);
@@ -577,9 +632,23 @@ void main(){
   for(int i=0;i<4;i++){ ivec2 q = c + dg[i]; if(!inside(q)) { dryN += 1.; continue; } vec4 Wd = texelFetch(u_W,q,0); if(Wd.r < 1e-4 && Wd.g < .5) dryN += 1.; }
   s += u_capK * .25 * (inS - outS);
   if(hn > 1e-4){ float a = u_absorb * (1. - s); s += a; hn -= a * u_sCost; }
-  hn -= u_evap * (1. + u_edgeEvap * dryN / 8.);
+  hn -= u_evap * (1. + u_edgeEvap * dryN / 8.) * mix(1., .25 + .75 * smoothstep(.03, .2, hn), u_thinSlow);
   if(hn <= 1e-4){ hn = 0.; s -= u_evapS; }
   s = clamp(s, 0., 1.);
+  // a slow stir inside moving water: the ink follows a drifting, swirling (divergence-free) field and curls into eddies
+  if(u_swirl > 0. && hn > .02){
+    // stirring is strongest where the water runs fast, but ink keeps curling slowly even in a calm pool
+    float sp = .35 + .65 * clamp(length(vec2(F.y - F.x, F.w - F.z)) / max(h, .03) * 3., 0., 1.);
+    {
+      vec2 q0 = vec2(c) * .03 + vec2(u_time * .0016, -u_time * .0011);
+      #define PSI(v) (vnoise(v) + .5 * vnoise((v) * 2.3 + 7.1))
+      float e = .35;
+      vec2 curl = vec2(PSI(q0 + vec2(0, e)) - PSI(q0 - vec2(0, e)), PSI(q0 - vec2(e, 0)) - PSI(q0 + vec2(e, 0))) / (2. * e);
+      vec2 d = curl * u_swirl * sp; float dl = length(d); if(dl > .8) d *= .8 / dl;
+      vec2 uvb = (vec2(c) + .5 - d) / vec2(SZ);
+      if(texture(u_W, uvb).r > .02) Pn += texture(u_P, uvb) - P;
+    }
+  }
   float pap = paperAt(c).r;
   float gm = dot(Pn.rgb, vec3(1./3.));
   float g = clamp(Pn.a / (gm + 1e-5), 0., 1.);
@@ -1071,21 +1140,27 @@ let layers = [], active = null, layerSeq = 1;
 const W = [], P = [], D = [], F = [], simFbo = [], fW = [], fP = [], fD = [], fF = [];
 let si = 0, fi = 0;
 let scratch, scratchF, backup, backupF;
-let simOwner = null, simHasContent = false, simSteps = 0, simBoost = 1, simTime = 0;
+let simOwner = null, simHasContent = false, simSteps = 0, simBoost = 1, simTime = 0, swirlClock = 0;   // swirlClock never jumps, so eddies drift smoothly
 let view = { x:0, y:0, z:1 }, dirty = true;
 let undoStack = [], redoStack = [], undoBytes = 0;
 const UNDO_BUDGET = (isCoarse ? 200 : 520) * 1024 * 1024;
 
 function simParams(){
   const pp = PAPERS[S.paper]; const bleed = S.bleed / 100, dry = S.drySpd / 100;
+  const tf = Math.min(1, Math.hypot(tilt.x, tilt.y) / .15);   // how far the tilted-sheet behaviour has faded in
   return {
     g:.14, damp:.9, slope:.05, openB: pp.openB / (.6 + .4 * bleed), openV: pp.openV / (.6 + .4 * bleed), fiberThr: pp.fiberThr,
     evap: .00024 * dry * simBoost, edgeEvap: 6, absorb: pp.absorb, sCost: pp.sCost, capK: Math.min(.95, pp.capK * 4 * bleed),
     delta: pp.delta / (.5 + .5 * bleed), sigB: pp.sigB / (.6 + .4 * bleed), sigV: pp.sigV / (.6 + .4 * bleed), evapS: .0009 * dry * simBoost,
-    vein: S.vein / 100, dep: .001, depDry: .1, desorb: .0012, pdiff: Math.min(.16, .1 * bleed), bloom: 3.5, granStr: S.gran / 100,
+    vein: S.vein / 100, dep: .001, depDry: .1, desorb: .0012, pdiff: Math.min(.16, .1 * bleed) * (1 - .6 * tf), bloom: 3.5, granStr: S.gran / 100,
+    tilt: [tilt.x * TILT_K / simQ, tilt.y * TILT_K / simQ], breach: tf > 0 ? TILT_BREACH : 99,
+    pdrag: 1 - .6 * tf, swirl: .6 * tf, film: .05 * tf, thinSlow: tf,
   };
 }
 function simLod(){ return Math.max(0, Math.log2(1 / simQ)); }
+// tilting the paper: tilt is the direction water runs (screen axes), length 0 (flat) to 1 (steepest)
+let tilt = { x:0, y:0 };
+const TILT_K = .08, TILT_BREACH = 1.4;   // slope per cell at full tilt; depth a puddle needs before it spills onto dry paper
 function dryStepsFull(){ const p = simParams(); return Math.ceil(1.3 / p.evap + 1 / p.evapS); }
 
 /* ================= document ================= */
@@ -1141,15 +1216,16 @@ function deleteLayer(L){
 /* ================= simulation ================= */
 function clearSim(){ for (let i = 0; i < 2; i++) { clearF(simFbo[i]); clearF(fF[i]); } simHasContent = false; simSteps = 0; simBoost = 1; tips.length = 0; }
 function simStep(){
-  const p = simParams(); simTime = (simTime + .618) % 97;
+  const p = simParams(); simTime = (simTime + .618) % 97; swirlClock = (swirlClock + 1) % 1e5;
   gl.disable(gl.BLEND);
   target(fF[1 - fi]);
-  use(progs.flux, { u_W:W[si], u_F:F[fi], u_paper:paperTex, u_plod: simLod(), u_vein:p.vein, u_g:p.g, u_damp:p.damp, u_slope:p.slope, u_openB:p.openB, u_openV:p.openV, u_fiberThr:p.fiberThr, u_time:simTime });
+  use(progs.flux, { u_W:W[si], u_F:F[fi], u_paper:paperTex, u_plod: simLod(), u_vein:p.vein, u_g:p.g, u_damp:p.damp, u_slope:p.slope, u_openB:p.openB, u_openV:p.openV, u_fiberThr:p.fiberThr, u_time:simTime, u_tilt:p.tilt, u_breach:p.breach, u_film:p.film });
   drawFull(); fi = 1 - fi;
   target(simFbo[1 - si]);
   use(progs.update, { u_W:W[si], u_F:F[fi], u_P:P[si], u_D:D[si], u_paper:paperTex, u_plod: simLod(), u_vein:p.vein, u_fiberThr:p.fiberThr,
     u_evap:p.evap, u_edgeEvap:p.edgeEvap, u_absorb:p.absorb, u_sCost:p.sCost, u_capK:p.capK, u_delta:p.delta, u_sigB:p.sigB, u_sigV:p.sigV, u_evapS:p.evapS,
-    u_dep:p.dep, u_depDry:p.depDry, u_desorb:p.desorb, u_pdiff:p.pdiff, u_granStr:p.granStr, u_bloom:p.bloom });
+    u_dep:p.dep, u_depDry:p.depDry, u_desorb:p.desorb, u_pdiff:p.pdiff, u_granStr:p.granStr, u_bloom:p.bloom,
+    u_pdrag:p.pdrag, u_swirl:p.swirl, u_thinSlow:p.thinSlow, u_time:swirlClock });
   drawFull(); si = 1 - si;
 }
 function finalizeDry(){
@@ -1516,6 +1592,7 @@ function spawnTendrils(x, y, R, a0, spread, n, scale){
 function stepTendrils(){
   if (!tips.length) return;
   const v = S.vein / 100;
+  const tl = Math.hypot(tilt.x, tilt.y), ta = Math.atan2(tilt.y, tilt.x);
   const out = [];
   for (let i = tips.length - 1; i >= 0; i--) {
     const t = tips[i];
@@ -1524,6 +1601,7 @@ function stepTendrils(){
     const n = f < .3 ? 3 : f < .7 ? 2 : 1;           // fast at first, slowing like spreading ink
     for (let k = 0; k < n; k++) {
       t.a += t.wobble + (Math.random() - .5) * .32;
+      if (tl > .02) t.a += Math.sin(ta - t.a) * .09 * tl;   // on a tilted sheet the threads of ink lean downhill
       const step = .7 + .6 * (1 - f);
       t.x += Math.cos(t.a) * step; t.y += Math.sin(t.a) * step; t.age += 1;
       const wet = wetAt(t.x, t.y);
@@ -1550,7 +1628,8 @@ function stepTendrils(){
     gp.list.forEach((d, j) => { data.set([d.x, d.y, d.r, 1, Math.cos(d.t.a), Math.sin(d.t.a), 1, d.amt], j * 8); });
     gl.bindVertexArray(dabVAO); gl.bindBuffer(gl.ARRAY_BUFFER, dabBuf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STREAM_DRAW);
     use(progs.brush, { u_doc:[doc.w, doc.h], u_pad:0, u_paper:paperTex, u_pig:gp.abs, u_gran:gp.gran * .5,
-      u_wAmt:.01, u_pAmt:.17 * (.6 + .4 * v), u_dFrac: clamp(.35 + .2 * v, .35, .7), u_shape:0, u_hard:.2, u_plod: simLod(), u_seed: 3.3 });
+      // on a tilted sheet most of it stays in the moving water, so the threads get carried along instead of staying pinned
+      u_wAmt:.01, u_pAmt:.17 * (.6 + .4 * v), u_dFrac: clamp(.35 + .2 * v, .35, .7) * (1 - .75 * Math.min(1, tl * 2)), u_shape:0, u_hard:.2, u_plod: simLod(), u_seed: 3.3 });
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gp.list.length);
   }
   gl.disable(gl.BLEND); gl.bindVertexArray(null);
@@ -1615,7 +1694,7 @@ function resize(){
 function fitView(){
   resize();
   let l = 24, r = 24, t = 24, b = 24;
-  if (!isNarrow()) { if (!$('#props').hidden) l = 260; if (!$('#layers').hidden || !$('#settings').hidden) r = 276; }
+  if (!isNarrow()) { if (!$('#props').hidden) l = 260; if (!$('#layers').hidden || !$('#settings').hidden || !$('#tilt').hidden) r = 276; }
   const aw = Math.max(50, stageRect.width - l - r), ah = Math.max(50, stageRect.height - t - b);
   const z = Math.min(aw / doc.w, ah / doc.h);
   view.z = z; view.x = l + (aw - doc.w * z) / 2; view.y = t + (ah - doc.h * z) / 2;
@@ -1812,6 +1891,7 @@ function frame(){
   }
   flushDabs();
   stepTendrils();
+  if (simSteps > 0 && simSteps < 160 && Math.hypot(tilt.x, tilt.y) > .02 && paperMaxH > 2e-3) simSteps = 160;   // water still running on a tilted sheet
   if (simSteps > 0) {
     const n = 2;
     for (let i = 0; i < n; i++) simStep();
@@ -2143,7 +2223,7 @@ function renderLayers(){
   $('#addLayer').disabled = layers.length >= 8;
 }
 function syncPanelBtns(){
-  $('#layBtn').setAttribute('aria-pressed', !$('#layers').hidden); $('#setBtn').setAttribute('aria-pressed', !$('#settings').hidden);
+  $('#layBtn').setAttribute('aria-pressed', !$('#layers').hidden); $('#setBtn').setAttribute('aria-pressed', !$('#settings').hidden); $('#tiltBtn').setAttribute('aria-pressed', !$('#tilt').hidden);
   const drawerOpen = $('#colorDrawer').classList.contains('open');
   $('#scrim').hidden = !(isNarrow() && (drawerOpen || ['props', 'layers', 'settings'].some(id => !$('#' + id).hidden)));
 }
@@ -2151,22 +2231,22 @@ function syncPanelBtns(){
 function togglePanel(id, force){
   const el = $('#' + id), open = force != null ? force : el.hidden;
   if (open) {
-    if (isNarrow()) { ['props', 'layers', 'settings'].forEach(k => { if (k !== id) $('#' + k).hidden = true; }); setDrawer(false, true); }
-    else if (id !== 'props') ['layers', 'settings'].forEach(k => { if (k !== id) $('#' + k).hidden = true; });
+    if (isNarrow()) { ['props', 'layers', 'settings', 'tilt'].forEach(k => { if (k !== id) $('#' + k).hidden = true; }); setDrawer(false, true); }
+    else if (id !== 'props') ['layers', 'settings', 'tilt'].forEach(k => { if (k !== id) $('#' + k).hidden = true; });
   }
   el.hidden = !open; syncPanelBtns();
 }
 function setDrawer(open, quiet){
   const d = $('#colorDrawer'); d.classList.toggle('open', open); d.setAttribute('aria-hidden', String(!open));
   $('#colorChip').setAttribute('aria-expanded', String(open));
-  if (open) { if (isNarrow()) ['props', 'layers', 'settings'].forEach(k => $('#' + k).hidden = true); requestAnimationFrame(sizePalette); }
+  if (open) { if (isNarrow()) ['props', 'layers', 'settings', 'tilt'].forEach(k => $('#' + k).hidden = true); requestAnimationFrame(sizePalette); }
   if (!quiet) syncPanelBtns();
 }
 $('#colorChip').addEventListener('click', () => setDrawer(!$('#colorDrawer').classList.contains('open')));
 $('#drawerClose').addEventListener('click', () => setDrawer(false));
-$('#scrim').addEventListener('pointerdown', e => { e.preventDefault(); ['props', 'layers', 'settings'].forEach(k => $('#' + k).hidden = true); setDrawer(false, true); syncPanelBtns(); });
+$('#scrim').addEventListener('pointerdown', e => { e.preventDefault(); ['props', 'layers', 'settings', 'tilt'].forEach(k => $('#' + k).hidden = true); setDrawer(false, true); syncPanelBtns(); });
 $$('[data-close]').forEach(b => b.addEventListener('click', () => { b.closest('.panel').hidden = true; syncPanelBtns(); }));
-window.addEventListener('keydown', e => { if (e.key === 'Escape') { setDrawer(false, true); if (isNarrow()) ['props', 'layers', 'settings'].forEach(k => $('#' + k).hidden = true); else ['layers', 'settings'].forEach(k => { if (k === 'settings') $('#' + k).hidden = true; }); syncPanelBtns(); } });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') { setDrawer(false, true); if (isNarrow()) ['props', 'layers', 'settings', 'tilt'].forEach(k => $('#' + k).hidden = true); else ['settings', 'tilt'].forEach(k => { $('#' + k).hidden = true; }); syncPanelBtns(); } });
 
 /* light / dark */
 const hostTheme = document.documentElement.getAttribute('data-theme');
@@ -2206,6 +2286,47 @@ $('#zoomIn').addEventListener('click', () => zoomStep(1.25));
 $('#zoomOut').addEventListener('click', () => zoomStep(.8));
 $('#layBtn').addEventListener('click', () => togglePanel('layers'));
 $('#setBtn').addEventListener('click', () => togglePanel('settings'));
+$('#tiltBtn').addEventListener('click', () => togglePanel('tilt'));
+
+/* ================= tilting the paper ================= */
+const TILT_DEG = 30;   // the pad's rim
+const DIRS = ['右', '右下', '下', '左下', '左', '左上', '上', '右上'];
+function setTilt(x, y){
+  let l = Math.hypot(x, y);
+  if (l > 1) { x /= l; y /= l; l = 1; }
+  if (l < .06) { x = 0; y = 0; l = 0; }
+  tilt = { x, y };
+  const a = Math.atan2(y, x);
+  // knob and line in fractions of the pad, so it works at any pad size (the phone shows a small one)
+  $('#tiltKnob').style.left = (50 + x * TILT_RIM) + '%'; $('#tiltKnob').style.top = (50 + y * TILT_RIM) + '%';
+  $('#tiltLine').setAttribute('x2', x * 75); $('#tiltLine').setAttribute('y2', y * 75);
+  const deg = Math.round(l * TILT_DEG), dir = DIRS[(Math.round(a / (Math.PI / 4)) + 8) % 8];
+  const txt = l ? `${dir}へ流れる・${deg}°` : '水平';
+  $('#tiltText').textContent = txt;
+  $('#tiltPad').setAttribute('aria-valuenow', deg); $('#tiltPad').setAttribute('aria-valuetext', txt);
+  $('#tiltBtn').classList.toggle('tilted', l > 0); $('#tiltArr').toggleAttribute('hidden', !l);
+  $('#tiltArr').style.transform = `rotate(${a}rad)`;
+  $('#tiltBtn').title = l ? `紙の傾き：${txt}` : '紙の傾き：濡れた水とインクを流す';
+}
+const TILT_RIM = 75 / 176 * 100;   // the knob's travel, in % of the pad
+{
+  const pad = $('#tiltPad');
+  let drag = null;
+  const fromEvent = e => { const r = pad.getBoundingClientRect(), R = r.width * TILT_RIM / 100; return [(e.clientX - r.left - r.width / 2) / R, (e.clientY - r.top - r.height / 2) / R]; };
+  pad.addEventListener('pointerdown', e => { e.preventDefault(); drag = e.pointerId; try { pad.setPointerCapture(e.pointerId); } catch (err) {} setTilt(...fromEvent(e)); });
+  pad.addEventListener('pointermove', e => { if (drag === e.pointerId) setTilt(...fromEvent(e)); });
+  const end = e => { if (drag === e.pointerId) drag = null; };
+  pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
+  $('#tiltReset').addEventListener('click', () => setTilt(0, 0));
+}
+// arrow keys nudge the sheet (anywhere outside a text field)
+window.addEventListener('keydown', e => {
+  const d = { ArrowLeft:[-1, 0], ArrowRight:[1, 0], ArrowUp:[0, -1], ArrowDown:[0, 1] }[e.key];
+  if (!d || e.ctrlKey || e.metaKey || e.altKey || (e.target.matches && e.target.matches('input,select,textarea'))) return;
+  e.preventDefault();
+  setTilt(tilt.x + d[0] * .1, tilt.y + d[1] * .1);
+});
+setTilt(0, 0);
 
 /* export */
 let lastURL = null, lastBlob = null, dlNS = null, dlBlocked = false;
@@ -2508,7 +2629,7 @@ function openStart(first){
   $('#startClose').hidden = first; $('#startKeep').hidden = first; $('#startWarn').hidden = first; $('#resume').hidden = true;
   $('#startWarn').textContent = '新しい紙にすると、今の絵は消えます（必要なら先に「画像を保存」してください）。'; $('#startGo').classList.add('primary');
   $('#startGo').textContent = first ? 'この紙で描きはじめる' : '新しい紙で描きはじめる';
-  ['props', 'layers', 'settings'].forEach(k => { if (isNarrow() || k === 'settings') $('#' + k).hidden = true; }); setDrawer(false, true); syncPanelBtns();
+  ['props', 'layers', 'settings', 'tilt'].forEach(k => { if (isNarrow() || k === 'settings' || k === 'tilt') $('#' + k).hidden = true; }); setDrawer(false, true); syncPanelBtns();
   syncStart(); $('#start').hidden = false;
   $('#stPick').hidden = false; $('#backResume').hidden = true; $('.startcard').scrollTop = 0;
   setTimeout(() => $('#startGo').focus({ preventScroll:true }), 50);
@@ -2541,7 +2662,7 @@ catch (err) { console.error(err); try { createDoc(1000, 750, .5); } catch (e2) {
 updateWetUI(true);
 buildStart(); openStart(true); checkSaved();
 window.__nijimi = { get S(){ return S; }, undo, redo, dryNow, get simSteps(){ return simSteps; }, fitView, createDoc, get view(){ return view; },
-  step(n){ for (let i = 0; i < n; i++) simStep(); }, params: () => simParams(),
+  step(n){ for (let i = 0; i < n; i++) simStep(); }, params: () => simParams(), setTilt,
   readSim(which, x, y, w, h){ const f = { W:fW, P:fP, D:fD }[which][si]; gl.bindFramebuffer(gl.FRAMEBUFFER, f); const px = new Float32Array(w * h * 4); gl.readPixels(x, y, w, h, gl.RGBA, gl.FLOAT, px); gl.bindFramebuffer(gl.FRAMEBUFFER, null); return Array.from(px); } };
 requestAnimationFrame(frame);
 })();
