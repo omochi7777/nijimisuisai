@@ -315,10 +315,10 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <div data-show="gouache">
         <div class="seg" id="shapeSeg"><button data-s="round">丸筆</button><button data-s="flat">平筆</button></div>
       </div>
-      <div class="row" data-show="pencil gpen brush flat sumi water drop gouache tissue eraser"><label for="size">サイズ</label><input id="size" type="range" min="1" max="200" step="1"><output id="sizeV"></output></div>
-      <div class="row" data-show="brush flat sumi drop gouache"><label for="conc" id="concL">絵の具</label><input id="conc" type="range" min="5" max="300" step="1"><output id="concV"></output></div>
+      <div class="row" data-show="pencil gpen calli fpen brush flat sumi water drop gouache tissue eraser"><label for="size">サイズ</label><input id="size" type="range" min="1" max="200" step="1"><output id="sizeV"></output></div>
+      <div class="row" data-show="calli fpen brush flat sumi drop gouache"><label for="conc" id="concL">絵の具</label><input id="conc" type="range" min="5" max="300" step="1"><output id="concV"></output></div>
       <div class="row" data-show="brush flat sumi water drop"><label for="water">水の量</label><input id="water" type="range" min="5" max="150" step="1"><output id="waterV"></output></div>
-      <div class="row" data-show="flat gouache-flat"><label for="angle">筆の角度</label><input id="angle" type="range" min="0" max="179" step="1"><output id="angleV"></output></div>
+      <div class="row" data-show="flat gouache-flat calli"><label for="angle" id="angleL">筆の角度</label><input id="angle" type="range" min="0" max="179" step="1"><output id="angleV"></output></div>
       <div class="row" data-show="gouache"><label for="scratch">かすれ</label><input id="scratch" type="range" min="0" max="100" step="1"><output id="scratchV"></output></div>
       <div class="row" data-show="gouache"><label for="gmix">混色</label><input id="gmix" type="range" min="0" max="100" step="1"><output id="gmixV"></output></div>
       <div class="row" data-show="tissue eraser"><label for="strength">強さ</label><input id="strength" type="range" min="5" max="100" step="1"><output id="strengthV"></output></div>
@@ -787,16 +787,28 @@ void main(){
   o = vec4(u_col * amt, 0.);
 }`;
 const FS_PEN = HEAD + DAB_IN + `
-uniform vec3 u_ink; uniform float u_rough, u_opaque;
+uniform vec3 u_ink; uniform float u_rough, u_opaque, u_nib, u_op, u_glaze; uniform sampler2D u_base;
 out vec4 o;
 void main(){
-  float r = v_a.z; float d = length(v_local);
+  float r = v_a.z;
   float pap = textureLod(u_paper, v_docpx / u_doc, u_plod).r;
-  float edge = r + (pap - .5) * u_rough * min(r, 2.5);
-  float cov = clamp(edge - d + .5, 0., 1.);
+  float rough = (pap - .5) * u_rough;
+  float cov;
+  if(u_nib > 0.){
+    // broad nib: a thin bar along the nib edge; sweeping it gives thick and thin strokes by direction
+    vec2 e = length(v_b.xy) > .001 ? normalize(v_b.xy) : vec2(1,0);
+    vec2 q = vec2(dot(v_local, e), dot(v_local, vec2(-e.y, e.x)));
+    float t = max(.6, r * u_nib);
+    cov = clamp(r + rough * min(r, 2.5) - abs(q.x) + .5, 0., 1.) * clamp(t + rough * min(t, 1.2) - abs(q.y) + .5, 0., 1.);
+  } else cov = clamp(r + rough * min(r, 2.5) - length(v_local) + .5, 0., 1.);
   if(cov <= 0.) discard;
   float dens = mix(.6, 1., smoothstep(.4, 2.5, r));
-  if(u_opaque > .5){ float a = cov * mix(.85, 1., smoothstep(.4, 2.5, r)); o = vec4(u_ink * a, a); }   // white ink covers what is below
+  if(u_opaque > .5){ float a = cov * mix(.85, 1., smoothstep(.4, 2.5, r)) * u_op; o = vec4(u_ink * a, a); }   // white ink covers what is below
+  else if(u_glaze > .5){
+    // translucent ink: darkens earlier strokes it crosses, but never piles up on itself within one stroke (MAX blend)
+    vec4 b = texture(u_base, v_docpx / u_doc);
+    o = vec4(b.rgb + u_ink * cov * dens * u_op, b.a);
+  }
   else o = vec4(u_ink * cov * dens, 0.);
 }`;
 
@@ -1002,6 +1014,8 @@ const GOUACHE_WHITE = [.978, .975, .966];
 const ICONS = {
   pencil:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M7 25 9 18 22 5l5 5-13 13z"/><path d="m9 18 5 5"/><path d="m7 25 1.6-.4L7.4 23.4z" fill="currentColor"/><path d="m19 8 5 5"/></svg>',
   gpen:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M16 29 10 16l3-9h6l3 9z"/><path d="M16 29V19"/><circle cx="16" cy="16.5" r="1.6" fill="currentColor"/><path d="M12 3h8v4h-8z"/></svg>',
+  calli:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M17 3h6v6h-6z" transform="rotate(35 20 6)"/><path d="m15.5 9.5 7 4.9-4.4 6.3-7-4.9z"/><path d="m11.1 15.8 7 4.9-3.4 2.8-5.4-3.8z" fill="currentColor" fill-opacity=".35"/><path d="M4 28.5c2-2.6 4-3.4 6-2.2s3.6 1.4 5.6-.6l1.4 1.2c-2.4 2.9-5 3.3-7.6 1.9-1.8-1-3.4-.6-4.6.9z" fill="currentColor" stroke="none"/></svg>',
+  fpen:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M16 25c-3.4-3.2-6-7.6-6-11.4C10 10 12.4 6.6 16 4.5c3.6 2.1 6 5.5 6 9.1 0 3.8-2.6 8.2-6 11.4z"/><path d="M16 25v-8.5" stroke-linecap="round"/><circle cx="16" cy="14.5" r="1.7" fill="currentColor"/><ellipse cx="16" cy="28" rx="4.5" ry="1.8" fill="currentColor" fill-opacity=".35" stroke="none"/></svg>',
   brush:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M21 3 15 13"/><path d="M14 11.5 18 14l-2 3"/><path d="M16 17c-2 6-6 9-11 10 1-5 3-9 9-12z" fill="currentColor" fill-opacity=".25"/></svg>',
   sumi:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M16 3v12"/><path d="M12.5 13h7v3h-7z"/><path d="M13 16c-.5 5 1 9 3 13 2-4 3.5-8 3-13z" fill="currentColor"/></svg>',
   water:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M16 4c4 6 8 10 8 15a8 8 0 0 1-16 0c0-5 4-9 8-15z"/><path d="M12 20a4 4 0 0 0 4 4" stroke-linecap="round"/></svg>',
@@ -1015,6 +1029,8 @@ const WET = ['brush', 'flat', 'sumi', 'water', 'drop'];
 const TOOLS = {
   pencil: { label:'鉛筆',     key:'p', target:'layer', size:4,  min:1, max:40,  hint:'筆圧で濃さ、ペンを寝かせると芯の腹で広く塗れます。紙の凹凸に粉が乗ります。' },
   gpen:   { label:'Gペン',    key:'g', target:'layer', size:10, min:1, max:60,  hint:'弱い筆圧で細く、押すと太く。入り抜きのある線になります。' },
+  calli:  { label:'カリグラフィーペン', short:'カリグラ', key:'c', target:'layer', size:22, min:4, max:90, angle:40, conc:100, hint:'ペン先が平らなペン。角度は固定なので、ペン先に沿って引くと細く、横切るように引くと太くなります。角度は「ペン先角度」で変えられます（回転を検知するペンなら回転に追従）。不透明度を下げると、重ねた所だけ濃くなる透けたインクになります。' },
+  fpen:   { label:'万年筆',   key:'m', target:'layer', size:5,  min:1, max:30,  conc:100, hint:'細くなめらかなインクの線。ペン先を止めて長押しすると、筆を押し付けたときの穂先のような形に、インクがじわりと滲み出します。滲む量は「にじみ」で変えられます。' },
   brush:  { label:'水彩筆',   key:'b', target:'sim',   size:46, min:3, max:240, conc:100, water:70, hint:'水と顔料を紙に置きます。乾く前に重ねると混ざってにじみ、縁には顔料がたまります。' },
   flat:   { label:'平筆',     key:'f', target:'sim',   size:60, min:6, max:260, conc:100, water:70, angle:30, hint:'幅の広い平らな穂先。角度は固定なので、動かす向きで太い面にも細い線にもなります（回転を検知するペンなら回転に追従）。' },
   sumi:   { label:'墨筆',     key:'s', target:'sim',   size:26, min:2, max:160, conc:170, water:50, hint:'穂先の細い筆。押すと太く。和紙を選ぶと繊維に沿ってにじみます。' },
@@ -1213,12 +1229,15 @@ let stroke = null;
 let dabQ = []; let qInfo = null;
 
 const isFlatTool = (tool, ts) => tool === 'flat' || (tool === 'gouache' && ts.shape === 'flat');
+const NIB = .12;   // calligraphy nib: thickness of the edge as a fraction of its width
 function toolRadius(tool, p, ts){
   const s = ts.size / 2;
   if (isFlatTool(tool, ts)) return Math.max(3, s * (.85 + .15 * p));
   switch (tool) {
     case 'pencil': return Math.max(.6, s * (.75 + .25 * p));
     case 'gpen':   return Math.max(.35, s * (.07 + .93 * Math.pow(p, 1.5)));
+    case 'calli':  return Math.max(2, s * (.82 + .18 * p));
+    case 'fpen':   return Math.max(.4, s * (.5 + .5 * Math.pow(p, 1.2)));
     case 'brush':  return Math.max(1.5, s * (.22 + .78 * p));
     case 'sumi':   return Math.max(1, s * (.05 + .95 * Math.pow(p, 1.35)));
     case 'water':  return Math.max(1.5, s * (.3 + .7 * p));
@@ -1231,7 +1250,8 @@ function toolSpacing(tool, r, ts){
   if (ts && isFlatTool(tool, ts)) return Math.max(.6, r * .07);
   switch (tool) {
     case 'pencil': return Math.max(.4, r * .35);
-    case 'gpen':   return Math.max(.3, r * .18);
+    case 'gpen': case 'fpen': return Math.max(.3, r * .18);
+    case 'calli':  return Math.max(.35, r * NIB * .7);
     case 'brush': case 'water': return Math.max(.7, r * .18);
     case 'sumi':   return Math.max(.4, r * .14);
     case 'gouache':return Math.max(.6, r * .15);
@@ -1261,7 +1281,7 @@ function beginStroke(e, pt){
     parts.push(snapSim());
   }
   // opaque marks (eraser, gouache, white ink / white pencil) also cover the wet wash on the same layer
-  const whiteMark = (tool === 'gpen' || (tool === 'pencil' && S.grade === '色')) && currentColor().white;
+  const whiteMark = (tool === 'gpen' || tool === 'calli' || tool === 'fpen' || (tool === 'pencil' && S.grade === '色')) && currentColor().white;
   const coversSim = (T.target === 'both' || whiteMark) && simOwner === active && simHasContent;
   if (coversSim) parts.push(snapSim());
   const layerSnap = T.target !== 'sim';
@@ -1270,7 +1290,7 @@ function beginStroke(e, pt){
   if (WET.includes(tool) && tool !== 'water' && S.vein > 0) readWetMap();
   stroke = { pid:e.pointerId, ptype:e.pointerType, tool, parts, layerSnap, layer:active, seed:qInfo.seed,
     bbox:[1e9, 1e9, -1e9, -1e9], last:pt, sm:{ x:pt.x, y:pt.y }, carry:0, res:1, dist:0, t0:performance.now(), lastDabT:performance.now(),
-    dir:[1, 0], pSm:pt.p, idle:0, eraseSim: coversSim };
+    dir:[1, 0], pSm:pt.p, idle:0, eraseSim: coversSim, holdT:performance.now(), holdAt:{ x:e.clientX, y:e.clientY }, bleedT:0, bleedN:0 };
   emitDab(pt);
   stroke.carry = toolSpacing(tool, toolRadius(tool, pt.p, qInfo.ts), qInfo.ts);
   if (T.target !== 'layer') { simHasContent = T.target === 'sim' ? true : simHasContent; wake(); }
@@ -1285,6 +1305,8 @@ function emitDab(pt, stationary){
   let bx = st.dir[0], by = st.dir[1], k = 1;
   if (tool === 'pencil') { bx = pt.tx; by = pt.ty; }
   if (tool === 'drop') { bx = 0; by = 0; }
+  // angle counted the way a calligrapher does (40° = edge rising to the right); a rotating pen turns the nib
+  if (tool === 'calli') { const a = ((pt.tw || 0) - (ts.angle || 0)) * Math.PI / 180; bx = Math.cos(a); by = Math.sin(a); }
   if (isFlatTool(tool, ts)) {
     // the chisel edge keeps its angle in the hand; a pen that reports barrel rotation turns it
     const a = ((ts.angle || 0) + (pt.tw || 0)) * Math.PI / 180;
@@ -1315,7 +1337,7 @@ function strokeTo(pt){
   if (st.tool === 'drop') { st.last = pt; st.sm = pt; return; }
   const a = st.sm;
   const k = 1 / (1 + S.stab * .7);
-  const b = { x: a.x + (pt.x - a.x) * k, y: a.y + (pt.y - a.y) * k, p: pt.p, tx: pt.tx, ty: pt.ty };
+  const b = { x: a.x + (pt.x - a.x) * k, y: a.y + (pt.y - a.y) * k, p: pt.p, tx: pt.tx, ty: pt.ty, tw: pt.tw };
   segment(st.last, b);
   st.sm = b;
 }
@@ -1329,7 +1351,7 @@ function segment(a, b){
   let d = st.carry;
   while (d <= L) {
     const t = d / L;
-    const q = { x: a.x + dx * t, y: a.y + dy * t, p: lerp(a.p, b.p, t), tx: lerp(a.tx, b.tx, t), ty: lerp(a.ty, b.ty, t) };
+    const q = { x: a.x + dx * t, y: a.y + dy * t, p: lerp(a.p, b.p, t), tx: lerp(a.tx, b.tx, t), ty: lerp(a.ty, b.ty, t), tw: b.tw };
     st.dist = base + d;
     emitDab(q);
     d += toolSpacing(st.tool, toolRadius(st.tool, q.p, qInfo.ts), qInfo.ts);
@@ -1439,11 +1461,16 @@ function flushDabs(){
       target(simFbo[si]); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
       use(progs.simErase, { ...sh, u_plod: simLod(), u_aW:0, u_aP: alpha, u_aD: alpha, u_tissue:2 }); draw();
     }
-  } else if (tool === 'gpen') {
+  } else if (tool === 'gpen' || tool === 'calli' || tool === 'fpen') {
     target(I.layer.fbo);
     if (I.white) gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA); else gl.blendEquation(gl.MAX);
-    const ink = I.white ? I.abs : I.abs.map(v => Math.min(5, v * 1.35 + .05));
-    use(progs.pen, { u_doc:docU, u_pad:0, u_paper:paperTex, u_ink:ink, u_plod:0, u_opaque: I.white ? 1 : 0, u_rough: S.paper === 'hot' ? .25 : .5 });
+    // fountain-pen dye ink is a little lighter than india ink, and soaks a little more raggedly into the paper
+    const ink = I.white ? I.abs : I.abs.map(v => tool === 'fpen' ? Math.min(4, v * 1.15 + .04) : Math.min(5, v * 1.35 + .05));
+    const rough = (S.paper === 'hot' ? .25 : .5) * (tool === 'fpen' ? 1.3 : 1);
+    const op = tool === 'calli' ? clamp((ts.conc != null ? ts.conc : 100) / 100, .05, 1) : 1;
+    const glaze = tool === 'calli' && !I.white && stroke && stroke.layerSnap;
+    use(progs.pen, { u_doc:docU, u_pad:0, u_paper:paperTex, u_ink:ink, u_plod:0, u_opaque: I.white ? 1 : 0, u_rough: rough, u_nib: tool === 'calli' ? NIB : 0,
+      u_op: op, u_glaze: glaze ? 1 : 0, u_base: glaze ? backup : dummy });
     draw();
     if (I.white && stroke && stroke.eraseSim) coverSim(draw, .9, .9);
   }
@@ -1528,6 +1555,51 @@ function stepTendrils(){
   }
   gl.disable(gl.BLEND); gl.bindVertexArray(null);
   simHasContent = true; if (simSteps < 120) wake(); dirty = true;
+}
+
+/* ================= fountain pen: ink bleeding out of a resting nib ================= */
+// the line itself is crisp ink on the layer; the bleed is wet ink in the watercolour simulation, so it spreads with the paper
+function fpenBleed(st, held){
+  if (!qInfo || qInfo.white) return;
+  if (!st.simPart) {
+    if (simOwner && simOwner !== st.layer && simHasContent) { const name = simOwner.name; bakeSim(true); toast(`「${name}」の濡れた絵の具を乾かして定着させました`); }
+    simOwner = st.layer; st.simPart = snapSim(); st.parts.push(st.simPart);
+  }
+  const pt = st.lastRaw || st.last, amt = (qInfo.ts.conc || 100) / 100;
+  const grow = Math.min(1.8, held / 2600);
+  const r0 = toolRadius('fpen', st.pSm, qInfo.ts);
+  // the bleed takes the shape of a brush pressed down at the end of a stroke: a round belly just ahead of the nib,
+  // tapering to a point back along the line it came from, and both grow the longer the nib rests
+  const dl = Math.hypot(st.dir[0], st.dir[1]), ux = dl > .01 ? st.dir[0] / dl : 1, uy = dl > .01 ? st.dir[1] / dl : 0;
+  const rb = (r0 * 1.2 + 2) * (1 + .6 * grow) * (.85 + .15 * Math.min(2, amt));
+  const len = rb * (1.6 + 1.4 * grow);
+  // each feed lands a little off the axis, so the edge ends up ragged rather than drawn with a ruler
+  const jp = (Math.random() - .5) * rb * .25, ja = (Math.random() - .5) * rb * .2;
+  const n = Math.min(16, Math.ceil(len / (rb * .35)) + 1);
+  const ink = new Float32Array(n * 8), wet = new Float32Array(n * 8);
+  for (let k = 0; k < n; k++) {
+    const t = n > 1 ? k / (n - 1) : 1;                      // 0 = tip of the tail, 1 = belly
+    const along = rb * .2 - (1 - t) * len + ja, rr = Math.max(1, rb * Math.pow(t, 1.2));
+    const x = pt.x + ux * along - uy * jp * t, y = pt.y + uy * along + ux * jp * t;
+    ink.set([x, y, rr, 1, 0, 0, 1, 1], k * 8);
+    wet.set([x, y, rr * 1.2 + 3 * Math.sqrt(grow), 1, 0, 0, 1, 1], k * 8);
+  }
+  gl.bindVertexArray(dabVAO); gl.bindBuffer(gl.ARRAY_BUFFER, dabBuf);
+  gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE);
+  target(simFbo[si]);
+  const sh = { u_doc:[doc.w, doc.h], u_pad:0, u_paper:paperTex, u_pig:qInfo.abs.map(v => Math.min(4, v * 1.15 + .04)), u_gran:0, u_shape:2, u_hard:.5, u_plod: simLod() };
+  // the paper just around the ink grows damp first, then the ink creeps out into it
+  gl.bufferData(gl.ARRAY_BUFFER, wet, gl.STREAM_DRAW);
+  use(progs.brush, { ...sh, u_wAmt:.025 * amt, u_pAmt:0, u_dFrac:0, u_seed: Math.random() * 10 });
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n);
+  gl.bufferData(gl.ARRAY_BUFFER, ink, gl.STREAM_DRAW);
+  use(progs.brush, { ...sh, u_wAmt:.07 * amt, u_pAmt:.3 * amt, u_dFrac:.3, u_seed: Math.random() * 10 });
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n);
+  gl.disable(gl.BLEND); gl.bindVertexArray(null);
+  simHasContent = true; wake(); dirty = true;
+  // now and then a fine hair of ink runs on from the tip of the tail
+  if (st.bleedN++ % 3 === 0) { readWetMap(); const tx = pt.x - ux * (len - rb * .2), ty = pt.y - uy * (len - rb * .2); spawnTendrils(tx, ty, 2, Math.atan2(-uy, -ux), .5, 1, .3 + .3 * grow); }
+  if (st.bleedN === 1) renderLayers();
 }
 
 /* ================= view ================= */
@@ -1626,9 +1698,17 @@ function gestureMove(){
 function showCursor(ev){
   if (ev.pointerType === 'touch' || panDrag || spaceDown || handMode) { cursorEl.style.display = 'none'; return; }
   const tool = (ev.pointerType === 'pen' && (ev.buttons & 32)) ? 'eraser' : S.tool;
-  const r = Math.max(1.5, (S.tools[tool].size / 2) * view.z * (tool === 'gpen' ? .6 : 1));
+  const r = Math.max(1.5, (S.tools[tool].size / 2) * view.z * (tool === 'gpen' ? .6 : tool === 'fpen' ? .8 : 1));
   const x = ev.clientX - stageRect.left, y = ev.clientY - stageRect.top;
   cursorEl.style.display = 'block';
+  if (tool === 'calli') {
+    // show the nib edge itself, at its angle
+    const h = Math.max(2, r * NIB * 2), a = (ev.pointerType === 'pen' && ev.twist ? ev.twist : 0) - (S.tools.calli.angle || 0);
+    cursorEl.style.borderRadius = '1px'; cursorEl.style.width = (r * 2) + 'px'; cursorEl.style.height = h + 'px';
+    cursorEl.style.transform = `translate(${x - r - 1}px, ${y - h / 2 - 1}px) rotate(${a}deg)`;
+    return;
+  }
+  cursorEl.style.borderRadius = '';
   cursorEl.style.width = cursorEl.style.height = (r * 2) + 'px';
   cursorEl.style.transform = `translate(${x - r - 1}px, ${y - r - 1}px)`;
 }
@@ -1673,6 +1753,8 @@ canvas.addEventListener('pointermove', e => {
     const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
     for (const ev of (evs.length ? evs : [e])) { const pt = readPoint(ev); stroke.lastRaw = pt; strokeTo(pt); }
     stroke.lastMoveT = performance.now(); stroke.idle = 0;
+    // a pen never sits perfectly still: only a real move (a few screen pixels) ends a long press
+    if (Math.hypot(e.clientX - stroke.holdAt.x, e.clientY - stroke.holdAt.y) > 4) { stroke.holdAt = { x:e.clientX, y:e.clientY }; stroke.holdT = stroke.lastMoveT; }
   }
 });
 function pointerEnd(e){
@@ -1719,6 +1801,11 @@ window.addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; 
 /* ================= loop ================= */
 function frame(){
   requestAnimationFrame(frame);
+  if (stroke && stroke.tool === 'fpen') {
+    // a nib resting on the paper keeps feeding ink into it
+    const now = performance.now(), held = now - stroke.holdT - 380;
+    if (held > 0 && now - stroke.bleedT > 110) { stroke.bleedT = now; fpenBleed(stroke, held); }
+  }
   if (stroke && stroke.tool === 'drop' && performance.now() - stroke.lastDabT > 380) emitDab({ x:stroke.last.x, y:stroke.last.y, p:stroke.pSm, tx:0, ty:0 });
   else if (stroke && TOOLS[stroke.tool].target === 'sim' && stroke.tool !== 'tissue' && stroke.tool !== 'drop' && ++stroke.idle >= 4 && performance.now() - stroke.lastDabT > 70 && performance.now() - (stroke.lastMoveT || 0) > 90) {
     emitDab({ x:stroke.last.x, y:stroke.last.y, p:stroke.pSm, tx:0, ty:0 }, true);
@@ -1775,7 +1862,7 @@ function buildTools(){
   for (const t in TOOLS) {
     const b = document.createElement('button');
     b.className = 'tool'; b.dataset.tool = t; b.title = `${TOOLS[t].label}（${TOOLS[t].key.toUpperCase()}）`;
-    b.innerHTML = ICONS[t] + `<span>${TOOLS[t].label}</span>`;
+    b.innerHTML = ICONS[t] + `<span>${TOOLS[t].short || TOOLS[t].label}</span>`;
     b.addEventListener('click', () => {
       if (S.tool === t && isNarrow()) { togglePanel('props'); return; }
       selectTool(t);
@@ -1794,7 +1881,9 @@ function syncProps(){
   const keys = [t]; if (t === 'gouache' && ts.shape === 'flat') keys.push('gouache-flat');
   $$('#props [data-show]').forEach(el => { el.hidden = !el.dataset.show.split(' ').some(k => keys.includes(k)); });
   const sz = $('#size'); sz.min = T.min; sz.max = T.max; sz.value = ts.size; $('#sizeV').textContent = ts.size;
-  $('#concL').textContent = t === 'gouache' ? '不透明度' : t === 'drop' ? '濃さ' : '絵の具';
+  $('#concL').textContent = t === 'gouache' || t === 'calli' ? '不透明度' : t === 'drop' ? '濃さ' : t === 'fpen' ? 'にじみ' : '絵の具';
+  $('#conc').max = t === 'calli' ? 100 : 300;
+  $('#angleL').textContent = t === 'calli' ? 'ペン先角度' : '筆の角度';
   if (ts.conc != null) { $('#conc').value = ts.conc; $('#concV').textContent = ts.conc + '%'; }
   if (ts.water != null) { $('#water').value = ts.water; $('#waterV').textContent = ts.water + '%'; }
   if (ts.strength != null) { $('#strength').value = ts.strength; $('#strengthV').textContent = ts.strength + '%'; }
@@ -1809,7 +1898,7 @@ function syncProps(){
   $('#swCur').style.background = col.hex; $('#colorName').textContent = col.name;
   $('#colorMeta').textContent = (col.white ? '白（水彩では色を淡くします）' : '粒状性 ' + (col.gran > .6 ? '強' : col.gran > .25 ? '中' : '弱')) + ' · ' + col.hex.toUpperCase();
   $('#colorPick').value = col.hex;
-  const usesColor = ['gpen', 'brush', 'flat', 'sumi', 'drop', 'gouache'].includes(t) || (t === 'pencil' && S.grade === '色');
+  const usesColor = ['gpen', 'calli', 'fpen', 'brush', 'flat', 'sumi', 'drop', 'gouache'].includes(t) || (t === 'pencil' && S.grade === '色');
   $('#chipDot').style.background = col.hex; $('#chipName').textContent = col.name;
   $('#colorChip').classList.toggle('muted', !usesColor);
   $('#colorChip').title = usesColor ? `色とパレット（${col.name}）` : `色とパレット（${T.label}は色を使いません）`;
