@@ -202,6 +202,7 @@ button,input,select{font:inherit;color:inherit}
 /* the start button stays in view at the bottom of the card, however small the screen */
 .stacts{position:sticky;bottom:calc(-1 * var(--cpb));z-index:2;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin:2px calc(-1 * var(--cpx)) calc(-1 * var(--cpb));padding:14px var(--cpx) var(--cpb);background:linear-gradient(to bottom,color-mix(in srgb,var(--panel) 0%,transparent),var(--panel) 16px);border-radius:0 0 20px 20px}
 .stacts #startWarn{flex-basis:100%;margin:0}
+.stacts .more{flex-basis:100%;text-align:left}
 .btn.big{height:46px;padding:0 22px;font-size:15px;font-weight:700;border-radius:14px}
 #startWarn{color:var(--warn)}
 .stacts .btn.big{box-shadow:0 6px 16px rgba(60,45,25,.18)}
@@ -255,11 +256,19 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 
 #toast{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:20;background:var(--ink);color:var(--chrome);padding:8px 14px;border-radius:8px;font-size:12.5px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:min(92%,460px);text-align:center;line-height:1.5}
 #toast.show{opacity:1}
-#modal{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-left,0px))}
-#modal .sheet{background:var(--panel);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;max-width:min(900px,100%);max-height:100%;box-sizing:border-box}
-#modal img{max-width:100%;max-height:65vh;object-fit:contain;border:1px solid var(--line);background:#fff;-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}
-#modal .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+#modal,#imgDlg{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-left,0px))}
+#modal .sheet,#imgDlg .sheet{overflow-y:auto;background:var(--panel);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;max-width:min(900px,100%);max-height:100%;box-sizing:border-box}
+#modal img,#imgDlg img{max-width:100%;max-height:65vh;object-fit:contain;border:1px solid var(--line);background:#fff;-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}
+#modal .acts,#imgDlg .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 #modal a.btn{text-decoration:none}
+#imgDlg{z-index:51}   /* above the start screen too: a picture can be opened from there */
+#imgDlg img{max-height:42vh;background:repeating-conic-gradient(#e8e4dc 0 25%,#fff 0 50%) 0 0/16px 16px}
+.njrow{display:flex;align-items:center;gap:12px;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
+.njrow .hint{margin:2px 0 0}
+.btn.two{height:auto;min-height:46px;padding:6px 14px;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;text-align:left}
+.btn.two small{font-size:11px;color:var(--muted);font-weight:400}
+#imgDlg .acts .two{flex:1 1 200px}
+#imgDlg #imgCancel{margin-left:auto}
 #fatal{position:fixed;inset:0;z-index:40;background:var(--chrome);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;line-height:1.7}
 
 @media (max-width:760px){
@@ -447,7 +456,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <button class="btn" id="tiltBtn" aria-pressed="false" title="紙の傾き：濡れた水とインクを流す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19 21 12"/><path d="M12 3.5c1.6 2.2 2.8 3.6 2.8 5a2.8 2.8 0 0 1-5.6 0c0-1.4 1.2-2.8 2.8-5z"/></svg><svg class="arr" id="tiltArr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M4 12h15M13 6l6 6-6 6"/></svg><span class="lbl">傾き</span></button>
     <button class="btn" id="setBtn" aria-pressed="false" title="紙の質感・にじみ・筆圧の設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span class="lbl">設定</span></button>
     <button class="btn" id="layBtn" aria-pressed="true" title="レイヤー"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 4 9 5-9 5-9-5z"/><path d="m3 14 9 5 9-5"/></svg><span class="lbl">レイヤー</span></button>
-    <button class="btn primary" id="saveBtn" title="PNG画像として書き出す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg><span class="lbl">画像を保存</span></button>
+    <button class="btn primary" id="saveBtn" title="保存：PNG画像、またはレイヤーごとのファイル（.nijimi）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg><span class="lbl">保存</span></button>
   </header>
 
   <nav id="tools" aria-label="道具"></nav>
@@ -531,6 +540,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <div class="ph"><span class="ptitle">レイヤー</span><span style="display:flex;gap:6px"><button class="btn" id="addLayer" title="レイヤーを追加">＋ 追加</button><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span></div>
       <ul id="layerList"></ul>
       <button class="btn" id="clearLayer">選択中のレイヤーを白紙に戻す</button>
+      <button class="btn" id="imgLayer" title="PNG・JPGなどの画像を新しいレイヤーとして読み込む">画像を読み込む</button>
       <p class="hint">水彩・鉛筆・インクは透明で、重ねると下の色と混ざって深くなります（減法混色）。ガッシュは不透明なので、上のレイヤーほど手前に来ます。<span style="color:var(--wet)">●</span> は濡れた絵の具が乗っているレイヤーです。</p>
     </section>
 
@@ -589,7 +599,8 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <small id="resumeTime"></small>
       <button class="btn primary big" id="resumeGo">続きから描く</button>
       <button class="btn big" id="toPick">新しい紙に描く</button>
-      <p class="hint">新しい紙に描きはじめると、この絵は上書きされます。残したいときは、続きを開いて「画像を保存」してください。</p>
+      <button class="more" data-open style="align-self:center">ファイルを開く（.nijimi・画像）</button>
+      <p class="hint">新しい紙に描きはじめると、この絵は上書きされます。残したいときは、続きを開いて「保存」してください。</p>
     </div>
     <div id="stPick" style="display:flex;flex-direction:column;gap:14px">
     <button class="more" id="backResume" hidden>← 前回の絵に戻る</button>
@@ -607,7 +618,8 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <p class="hint">「水の計算」は軽いほど速く動きます。スマホで重いときは「軽量」を選んでください。ほかの項目は、描いている途中でも「設定」から変えられます。</p>
     </div>
     <div class="stacts">
-      <p class="hint" id="startWarn" hidden>新しい紙にすると、今の絵は消えます（必要なら先に「画像を保存」してください）。</p>
+      <p class="hint" id="startWarn" hidden>新しい紙にすると、今の絵は消えます（必要なら先に「保存」してください）。</p>
+      <button class="more" data-open title="にじみ帖のファイル（.nijimi）で続きから描く、または画像を読み込む">ファイルを開く（.nijimi・画像）</button>
       <button class="btn" id="startKeep" hidden>紙の質感だけ変える</button>
       <button class="btn primary big" id="startGo">この紙で描きはじめる</button>
     </div>
@@ -617,12 +629,30 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 
 <div id="modal" hidden>
   <div class="sheet">
-    <div class="ph"><span class="ptitle">書き出した画像</span><span class="hint" id="outSize"></span></div>
+    <div class="ph"><span class="ptitle">保存</span><span class="hint" id="outSize"></span></div>
     <img id="outImg" alt="書き出した絵">
     <p class="hint" id="dlHint">ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。</p>
+    <div class="njrow" id="njRow">
+      <div><b>にじみ帖のファイル（.nijimi）</b><p class="hint">レイヤーごと保存します。「新しい紙」→「ファイルを開く」で続きから描けます。</p><p class="hint" id="njInfo" role="status"></p></div>
+      <button class="btn" id="njSave">.nijimi で保存</button>
+    </div>
     <div class="acts"><a class="btn primary" id="dlLink" download="nijimi.png" href="#">PNGをダウンロード</a><button class="btn" id="closeModal">閉じる</button></div>
   </div>
 </div>
+<div id="imgDlg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="imgTitle">
+    <div class="ph"><span class="ptitle" id="imgTitle">画像を重ねる</span><span class="hint" id="imgSize"></span></div>
+    <img id="imgPrev" alt="読み込む画像">
+    <p class="hint">新しいレイヤーとして、紙に収まる大きさで真ん中に置きます。</p>
+    <div class="acts">
+      <button class="btn two" data-mode="mul"><b>透明に重ねる</b><small>白い所が透けます（線画・下絵向き）</small></button>
+      <button class="btn two" data-mode="opaque"><b>不透明に置く</b><small>写真などをそのまま見せます</small></button>
+      <button class="btn" id="imgCancel">やめる</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="openFile" hidden>
+<input type="file" id="imgFile" accept="image/*" hidden>
 <div id="fatal" hidden><div><p style="font-size:16px;font-weight:700;margin:0 0 8px">起動できませんでした</p><p id="fatalMsg" class="hint" style="font-size:13px"></p></div></div>
 
 <script>
@@ -2822,10 +2852,11 @@ if (window.claude && typeof window.claude.use === 'function') {
   // viewers outside the owner's organisation cannot download from the page: find out early and offer long-press instead
   window.claude.use('permissions').then(pm => pm && pm.state('downloads')).then(st => { if (st === 'unavailable' || st === 'denied') dlBlocked = true; }).catch(() => {});
 }
+function fileStamp(){ const d = new Date(), pad = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`; }
 function syncDownloadUI(){
   const inViewer = !!(window.claude && typeof window.claude.use === 'function');
   const off = inViewer && (!dlNS || dlBlocked);
-  $('#dlLink').hidden = off;
+  $('#dlLink').hidden = off; $('#njRow').hidden = off;
   $('#dlHint').innerHTML = off
     ? '<b style="color:var(--ink)">画像を長押し</b>して保存してください（PCは右クリック →「名前を付けて画像を保存」）。この画面ではダウンロードボタンが使えません。'
     : 'ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。';
@@ -2860,8 +2891,8 @@ $('#saveBtn').addEventListener('click', () => {
     if (lastURL) URL.revokeObjectURL(lastURL);
     lastURL = URL.createObjectURL(blob); lastBlob = blob;
     $('#outImg').src = lastURL; $('#dlLink').href = lastURL;
-    const d = new Date(); const pad = n => String(n).padStart(2, '0');
-    $('#dlLink').download = `nijimi_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.png`;
+    $('#dlLink').download = `nijimi_${fileStamp()}.png`;
+    $('#njInfo').textContent = '';
     $('#outSize').textContent = `${doc.w} × ${doc.h} px`;
     // inside the Claude viewer without the download permission, a plain link does nothing: offer long-press / right-click instead
     syncDownloadUI();
@@ -2916,9 +2947,26 @@ async function pack(u16){
   return { raw:false, buf: await new Response(st).arrayBuffer() };
 }
 async function unpack(o){
-  if (o.raw) return new Uint16Array(o.buf);
-  const st = new Blob([o.buf]).stream().pipeThrough(new DecompressionStream('gzip'));
-  return new Uint16Array(await new Response(st).arrayBuffer());
+  let buf = o.buf;
+  if (!o.raw) buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  return o.split ? joinBytes(new Uint8Array(buf)) : new Uint16Array(buf);
+}
+// files: the high bytes of every half-float first, then the low bytes. The high bytes repeat a lot, so gzip shrinks the file
+// by about a quarter more, with every value kept exactly
+function splitBytes(u16){
+  const n = u16.length, out = new Uint8Array(n * 2);
+  for (let i = 0; i < n; i++) { const v = u16[i]; out[i] = v >> 8; out[n + i] = v & 255; }
+  return out;
+}
+function joinBytes(u8){
+  const n = u8.length >> 1, out = new Uint16Array(n);
+  for (let i = 0; i < n; i++) out[i] = u8[i] << 8 | u8[n + i];
+  return out;
+}
+async function packSplit(u16){
+  const b = splitBytes(u16);
+  if (typeof CompressionStream === 'undefined') return { raw:true, split:true, buf:b.buffer };
+  return { raw:false, split:true, buf: await new Response(new Blob([b]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer() };
 }
 function thumbnail(){
   const tw = 240, th = Math.max(1, Math.round(240 * doc.h / doc.w)), sc = tw / doc.w;
@@ -2937,6 +2985,20 @@ function thumbnail(){
   c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px.buffer), tw, th), 0, 0);
   return c.toDataURL('image/jpeg', .82);
 }
+// read the whole picture off the GPU in one go (synchronously, so nothing can change it half-way); compressing it comes after
+function captureDrawing(){
+  flushDabs();
+  const raw = layers.map(L => readHalf(L.fbo, doc.w, doc.h));
+  let simRaw = null;
+  if (simOwner && simHasContent) {
+    const t = mkTex(sim.w, sim.h), f = mkFbo([t]);
+    gl.disable(gl.BLEND); target(f); use(progs.sum, { u_P:P[si], u_D:D[si] }); drawFull(); target(null);
+    simRaw = readHalf(f, sim.w, sim.h); freeTF(t, f);
+  }
+  const meta = { v:1, w:doc.w, h:doc.h, q:simQ, paper:S.paper, seed:paperSeed, active: layers.indexOf(active), owner: simRaw ? layers.indexOf(simOwner) : -1,
+    layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), savedAt: Date.now() };
+  return { raw, simRaw, meta, thumb: thumbnail() };
+}
 let saveTimer = 0, saving = false, saveGen = 0, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
 function markChanged(){
   if (!docReady || restoring || !vaultOK) return;
@@ -2948,18 +3010,7 @@ async function saveDrawing(){
   saving = true; saveTimer = 0;
   const gen = saveGen;   // bumped when the save is deleted: a save still compressing must not bring it back
   try {
-    flushDabs();
-    // read everything synchronously, then compress and store in the background
-    const raw = layers.map(L => readHalf(L.fbo, doc.w, doc.h));
-    let simRaw = null;
-    if (simOwner && simHasContent) {
-      const t = mkTex(sim.w, sim.h), f = mkFbo([t]);
-      gl.disable(gl.BLEND); target(f); use(progs.sum, { u_P:P[si], u_D:D[si] }); drawFull(); target(null);
-      simRaw = readHalf(f, sim.w, sim.h); freeTF(t, f);
-    }
-    const meta = { v:1, w:doc.w, h:doc.h, q:simQ, paper:S.paper, seed:paperSeed, active: layers.indexOf(active), owner: simRaw ? layers.indexOf(simOwner) : -1,
-      layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), savedAt: Date.now() };
-    const thumb = thumbnail();
+    const { raw, simRaw, meta, thumb } = captureDrawing();
     const data = [];
     for (const r of raw) data.push(await pack(r));
     const simData = simRaw ? await pack(simRaw) : null;
@@ -2971,35 +3022,43 @@ async function saveDrawing(){
     if (err && err.name === 'QuotaExceededError') toast('端末の空き容量が足りず、保存できませんでした');
   } finally { saving = false; }
 }
+// unpack everything before touching the document: whatever runs during these waits (a key, a timer) only meets the old picture,
+// and the new one is then built in one go with nothing in between (the same peak memory as saving)
+async function decodeDrawing(rec){
+  const m = rec.meta;
+  const px = [];
+  for (let i = 0; i < m.layers.length; i++) px.push(await unpack(rec.data[i]));
+  const simPx = rec.simData && m.owner >= 0 && m.owner < m.layers.length ? await unpack(rec.simData) : null;
+  const sw = Math.round(m.w * m.q), sh = Math.round(m.h * m.q);
+  if (px.some(p => p.length !== m.w * m.h * 4) || (simPx && simPx.length !== sw * sh * 4)) throw new Error('size mismatch');
+  return { m, px, simPx };
+}
 async function restoreDrawing(rec){
   restoring = true;
   try {
-    const m = rec.meta;
-    // unpack everything before touching the document: whatever runs during these waits (a key, a timer) only meets the old picture,
-    // and the new one is then built in one go with nothing in between (the same peak memory as saving)
-    const px = [];
-    for (let i = 0; i < m.layers.length; i++) px.push(await unpack(rec.data[i]));
-    const simPx = rec.simData && m.owner >= 0 && m.owner < m.layers.length ? await unpack(rec.simData) : null;
-    S.paper = PAPERS[m.paper] ? m.paper : 'cold'; saveSettings();
-    createDoc(m.w, m.h, m.q, m.seed);
-    while (layers.length < m.layers.length) addLayer();
-    while (layers.length > m.layers.length) { const L = layers.pop(); freeTF(L.tex, L.fbo); }
-    for (let i = 0; i < layers.length; i++) {
-      const L = layers[i], info = m.layers[i];
-      L.name = info.name; L.visible = info.visible; L.opacity = info.opacity;
-      gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, m.w, m.h, gl.RGBA, gl.HALF_FLOAT, px[i]);
-    }
-    layerSeq = layers.length + 1;
-    active = layers[clamp(m.active, 0, layers.length - 1)] || layers[0];
-    if (simPx) {
-      gl.bindTexture(gl.TEXTURE_2D, D[si]); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, sim.w, sim.h, gl.RGBA, gl.HALF_FLOAT, simPx);
-      simOwner = layers[m.owner]; simHasContent = true; simSteps = 0;
-    }
-    syncSettings(); renderLayers(); dirty = true;
+    applyDrawing(await decodeDrawing(rec));
     return true;
   } catch (err) {
     console.error(err); toast('保存した絵を読み込めませんでした。新しい紙で始めます'); createDoc(1200, 1600, simQ); return false;
   } finally { restoring = false; }
+}
+function applyDrawing({ m, px, simPx }){
+  S.paper = PAPERS[m.paper] ? m.paper : 'cold'; saveSettings();
+  createDoc(m.w, m.h, m.q, m.seed);
+  while (layers.length < m.layers.length) addLayer();
+  while (layers.length > m.layers.length) { const L = layers.pop(); freeTF(L.tex, L.fbo); }
+  for (let i = 0; i < layers.length; i++) {
+    const L = layers[i], info = m.layers[i];
+    L.name = info.name; L.visible = info.visible; L.opacity = info.opacity;
+    gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, m.w, m.h, gl.RGBA, gl.HALF_FLOAT, px[i]);
+  }
+  layerSeq = layers.length + 1;
+  active = layers[clamp(m.active, 0, layers.length - 1)] || layers[0];
+  if (simPx) {
+    gl.bindTexture(gl.TEXTURE_2D, D[si]); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, sim.w, sim.h, gl.RGBA, gl.HALF_FLOAT, simPx);
+    simOwner = layers[m.owner]; simHasContent = true; simSteps = 0;
+  }
+  syncSettings(); renderLayers(); dirty = true;
 }
 let savedRec = null;
 async function checkSaved(){
@@ -3011,7 +3070,7 @@ async function checkSaved(){
     $('#resumeImg').src = savedRec.thumb || '';
     $('#resumeTime').textContent = `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())} に保存 · ${PAPER_INFO[savedRec.meta.paper] ? PAPER_INFO[savedRec.meta.paper].name : ''}`;
     if (st.first && !$('#start').hidden) {
-      $('#startWarn').hidden = false; $('#startWarn').textContent = '新しい紙で描きはじめると、保存されている前回の絵は上書きされます。'; $('#startGo').textContent = '新しい紙で描きはじめる';
+      $('#startWarn').hidden = false; $('#startWarn').textContent = '新しい紙やファイルで描きはじめると、保存されている前回の絵は上書きされます。'; $('#startGo').textContent = '新しい紙で描きはじめる';
       showResumeView(true);
     }
   } catch (err) { vaultOK = false; console.warn('storage unavailable', err); }
@@ -3034,6 +3093,139 @@ $('#forgetBtn').addEventListener('click', async () => {
   clearTimeout(saveTimer); saveTimer = 0; saveGen++;
   try { await vault.del('drawing'); savedRec = null; docReady = false; toast('この端末の保存を消しました。次に描いたときから、また保存されます'); setTimeout(() => { docReady = true; }, 100); }
   catch (e) { toast('保存を消せませんでした'); }
+});
+
+/* ================= .nijimi files: the whole picture, layers and all, to keep anywhere and open again ================= */
+// "NIJIMI" 0 <version> | header length (u32, little-endian) | header (JSON) | the parts the header lists, one after another:
+// each layer, then the settled watercolour if any (half-floats, bytes split, gzip), then a small JPEG preview
+const NJ_MAGIC = [78, 73, 74, 73, 77, 73, 0], NJ_VERSION = 1, NJ_MAX_SIDE = 4096;
+function fmtSize(n){ return n < 1048576 ? Math.max(1, Math.round(n / 1024)) + 'KB' : (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + 'MB'; }
+async function buildNijimi(){
+  const { raw, simRaw, meta, thumb } = captureDrawing();
+  const parts = [];
+  for (const r of raw) parts.push(await packSplit(r));
+  if (simRaw) parts.push(await packSplit(simRaw));
+  const bin = atob(thumb.slice(thumb.indexOf(',') + 1)), jpg = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) jpg[i] = bin.charCodeAt(i);
+  const head = new TextEncoder().encode(JSON.stringify({ app:'nijimi', ...meta,
+    enc: parts[0].raw ? 'split16' : 'split16+gzip', parts: parts.map(p => p.buf.byteLength), thumb: jpg.length }));
+  const pre = new Uint8Array(12); pre.set(NJ_MAGIC); pre[7] = NJ_VERSION; new DataView(pre.buffer).setUint32(8, head.length, true);
+  return new Blob([pre, head, ...parts.map(p => p.buf), jpg], { type:'application/octet-stream' });
+}
+async function isNijimi(file){ const b = new Uint8Array(await file.slice(0, 7).arrayBuffer()); return b.length === 7 && NJ_MAGIC.every((v, i) => b[i] === v); }
+// turns a file back into the same record the device save uses, checking everything that would otherwise break the picture
+async function readNijimi(file){
+  const buf = await file.arrayBuffer(), u8 = new Uint8Array(buf);
+  if (u8[7] > NJ_VERSION) throw Object.assign(new Error('newer file'), { newer:true });
+  const hl = new DataView(buf).getUint32(8, true);
+  const h = JSON.parse(new TextDecoder().decode(u8.subarray(12, 12 + hl)));
+  const okSide = v => Number.isInteger(v) && v > 0 && v <= NJ_MAX_SIDE;
+  if (!okSide(h.w) || !okSide(h.h) || !(h.q > 0 && h.q <= 1) || !Array.isArray(h.layers) || h.layers.length < 1 || h.layers.length > 8
+    || !Array.isArray(h.parts) || h.parts.length < h.layers.length || !['split16', 'split16+gzip'].includes(h.enc)) throw new Error('bad header');
+  let at = 12 + hl;
+  const bufs = h.parts.map(n => { const b = buf.slice(at, at + n); at += n; return b; });
+  if (at > buf.byteLength) throw new Error('file is cut short');
+  const part = b => ({ raw: h.enc === 'split16', split:true, buf:b });
+  const n = h.layers.length, owner = Number.isInteger(h.owner) && h.owner >= 0 && h.owner < n && bufs.length > n ? h.owner : -1;
+  const meta = { w:h.w, h:h.h, q:h.q, paper:h.paper, seed: +h.seed || 0, active: Number.isInteger(h.active) ? h.active : 0, owner,
+    layers: h.layers.map((L, i) => ({ name: String(L && L.name || 'レイヤー ' + (i + 1)).slice(0, 40), visible: !(L && L.visible === false), opacity: L && Number.isFinite(+L.opacity) ? clamp(+L.opacity, 0, 1) : 1 })) };
+  return { meta, data: bufs.slice(0, n).map(part), simData: owner >= 0 ? part(bufs[n]) : null };
+}
+let njBusy = false;
+$('#njSave').addEventListener('click', async () => {
+  if (stroke || njBusy) return;
+  const b = $('#njSave'); njBusy = true; b.disabled = true; b.textContent = 'ファイルを作っています…';
+  try {
+    const blob = await buildNijimi(), name = `nijimi_${fileStamp()}.nijimi`;
+    if (dlNS) await dlNS.save({ filename:name, data:blob });   // inside the Claude viewer
+    else {
+      const u = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000);
+    }
+    $('#njInfo').textContent = `「${name}」を保存しました（${fmtSize(blob.size)}）`;
+    toast(`.nijimi で保存しました（${fmtSize(blob.size)}）`);
+  } catch (err) {
+    if (err && err.code === 'declined') return;
+    console.error(err);
+    if (dlNS) { dlBlocked = true; syncDownloadUI(); }
+    toast('ファイルを保存できませんでした');
+  } finally { njBusy = false; b.disabled = false; b.textContent = '.nijimi で保存'; }
+});
+async function openNijimiFile(file){
+  let d;
+  restoring = true;
+  try { d = await decodeDrawing(await readNijimi(file)); }
+  catch (err) {
+    restoring = false; console.error(err);
+    toast(err && err.newer ? 'このファイルは新しい版のにじみ帖で作られています。ページを更新してから開いてください' : 'このファイルは開けませんでした（壊れているか、途中までしかありません）');
+    return;
+  }
+  // everything checked and unpacked: only now is the current picture replaced
+  try { if (stroke) cancelStroke(); applyDrawing(d); }
+  catch (err) { console.error(err); toast('メモリが足りず開けませんでした。新しい紙で始めます'); createDoc(1200, 1600, simQ); }
+  finally { restoring = false; }
+  closeStart(); docReady = true; markChanged();
+  toast(`「${file.name}」を開きました`);
+}
+
+/* ================= pictures (PNG, JPG…) brought in as a layer ================= */
+// layers hold absorbance, the way transparent paint darkens the paper: a pixel's colour c becomes -log(c), so white lets everything through.
+// "opaque" also lays the gouache white underneath, so the picture hides what is below it instead of tinting it
+const ABS_LUT = (() => { const t = new Float32Array(256); for (let i = 0; i < 256; i++) t[i] = -Math.log(Math.max(i / 255, .012)); return t; })();   // .012: the same floor as absOf
+function importImage(bmp, mode, name){
+  if (layers.length >= 8) { toast('レイヤーは8枚までです。どれかを消してから読み込んでください'); return; }
+  const s = Math.min(doc.w / bmp.width, doc.h / bmp.height), w = Math.max(1, Math.round(bmp.width * s)), h = Math.max(1, Math.round(bmp.height * s));
+  const c = document.createElement('canvas'); c.width = doc.w; c.height = doc.h;
+  const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+  g.drawImage(bmp, Math.round((doc.w - w) / 2), Math.round((doc.h - h) / 2), w, h);
+  const src = g.getImageData(0, 0, doc.w, doc.h).data, out = new Float32Array(src.length), opaque = mode === 'opaque';
+  // a see-through pixel first takes the colour it would show over white paper, so soft edges look as they do in any image viewer
+  const absOver = (v, a) => -Math.log(Math.max(1 - a * (1 - v / 255), .012));
+  for (let i = 0; i < src.length; i += 4) {
+    const a8 = src[i + 3]; if (!a8) continue;
+    if (a8 === 255) { out[i] = ABS_LUT[src[i]]; out[i + 1] = ABS_LUT[src[i + 1]]; out[i + 2] = ABS_LUT[src[i + 2]]; }
+    else { const a = a8 / 255; out[i] = absOver(src[i], a); out[i + 1] = absOver(src[i + 1], a); out[i + 2] = absOver(src[i + 2], a); }
+    out[i + 3] = opaque ? a8 / 255 : 0;
+  }
+  const L = addLayer(name);
+  gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, doc.w, doc.h, gl.RGBA, gl.FLOAT, out);
+  active = L; pushUndo([{ kind:'stack', layer:L, at:layers.indexOf(L), held:false, bytes:0 }]); renderLayers(); dirty = true;
+  toast(`「${name}」を新しいレイヤーに読み込みました（元に戻せます）`);
+}
+const looksLikeImage = file => /^image\//.test(file.type) || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file.name);
+let imgPick = null;   // { bmp, url, name, fresh }: fresh = start a new sheet for it (opened from the start screen)
+async function pickImage(file, fresh){
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation:'from-image' }); }
+  catch (err) { console.error(err); toast('この画像は読み込めませんでした'); return; }
+  if (!fresh && layers.length >= 8) { bmp.close(); toast('レイヤーは8枚までです。どれかを消してから読み込んでください'); return; }
+  closeImgDlg();
+  imgPick = { bmp, url: URL.createObjectURL(file), name: file.name.replace(/\.[^.]+$/, '').slice(0, 20) || '画像', fresh };
+  $('#imgPrev').src = imgPick.url; $('#imgSize').textContent = `${bmp.width} × ${bmp.height} px`;
+  $('#imgDlg').hidden = false;
+}
+function closeImgDlg(){
+  if (imgPick) { imgPick.bmp.close(); URL.revokeObjectURL(imgPick.url); imgPick = null; }
+  $('#imgDlg').hidden = true; $('#imgPrev').removeAttribute('src');
+}
+$$('#imgDlg [data-mode]').forEach(b => b.addEventListener('click', () => {
+  const p = imgPick; if (!p) return;
+  if (p.fresh) $('#startGo').click();   // the paper and size picked on the start screen
+  importImage(p.bmp, b.dataset.mode, p.name);
+  closeImgDlg();
+}));
+$('#imgCancel').addEventListener('click', closeImgDlg);
+$('#imgDlg').addEventListener('click', e => { if (e.target.id === 'imgDlg') closeImgDlg(); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#imgDlg').hidden) closeImgDlg(); });
+$('#imgLayer').addEventListener('click', () => { if (stroke) return; $('#imgFile').value = ''; $('#imgFile').click(); });
+$('#imgFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) pickImage(f, false); });
+// the start screen opens either kind of file; no type filter on the picker, since phones would grey out .nijimi
+$$('[data-open]').forEach(b => b.addEventListener('click', () => { $('#openFile').value = ''; $('#openFile').click(); }));
+$('#openFile').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  if (await isNijimi(f)) openNijimiFile(f);
+  else if (looksLikeImage(f)) pickImage(f, true);
+  else toast('開けるのは、にじみ帖のファイル（.nijimi）と画像（PNG・JPG など）です');
 });
 
 /* ================= start screen: choose the paper ================= */
@@ -3116,7 +3308,7 @@ function openStart(first){
     const cur = SIZES.find(z => z.w === doc.w && z.h === doc.h); if (cur) st.size = cur.k; st.q = simQ;
   }
   $('#startClose').hidden = first; $('#startKeep').hidden = first; $('#startWarn').hidden = first; $('#resume').hidden = true;
-  $('#startWarn').textContent = '新しい紙にすると、今の絵は消えます（必要なら先に「画像を保存」してください）。'; $('#startGo').classList.add('primary');
+  $('#startWarn').textContent = '新しい紙にしたりファイルを開いたりすると、今の絵は消えます（必要なら先に「保存」してください）。'; $('#startGo').classList.add('primary');
   $('#startGo').textContent = first ? 'この紙で描きはじめる' : '新しい紙で描きはじめる';
   ['props', 'layers', 'settings', 'tilt'].forEach(k => { if (isNarrow() || k === 'settings' || k === 'tilt') $('#' + k).hidden = true; }); setDrawer(false, true); syncPanelBtns();
   syncStart(); $('#start').hidden = false;
