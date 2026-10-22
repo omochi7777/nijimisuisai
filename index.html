@@ -118,6 +118,7 @@ button,input,select{font:inherit;color:inherit}
 #rotBtn svg{width:16px;height:16px;transition:transform .2s}
 #tiltBtn.tilted{border-color:var(--wet);color:var(--wet)}
 .mclose{display:none}
+#props .mclose{display:inline-flex}   /* the tool panel can be closed at any width; tapping the selected tool brings it back */
 #scrim{position:absolute;inset:0;z-index:6;background:rgba(12,16,22,.26)}
 
 /* selected colour: a small chip on the paper, the colour drawer slides out from it */
@@ -232,11 +233,18 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0;height:22px}
 select{height:30px;border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:0 6px;width:100%}
 
 #layerList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-#layerList li{display:grid;grid-template-columns:28px 1fr 58px 18px 26px;align-items:center;gap:6px;padding:5px 6px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+#layerList li{position:relative;display:grid;grid-template-columns:28px 1fr 58px 18px 26px;align-items:center;gap:6px;padding:5px 6px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
 #layerList li.on{border-color:var(--accent);background:var(--active)}
 #layerList .eye,#layerList .del{width:26px;height:26px;border:0;background:none;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;border-radius:6px;padding:0}
 #layerList .eye svg,#layerList .del svg{width:16px;height:16px}
-#layerList .del.confirm{background:var(--warn);color:#fff;width:auto;padding:0 4px;font-size:11px}
+/* the bin looks small but takes taps from the whole right end of the row; once armed it widens into a plain "delete" button */
+#layerList .del{position:relative;transition:background-color .12s,color .12s}
+#layerList .del::before{content:"";position:absolute;inset:-6px -7px -6px -5px}
+#layerList .del:hover{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+#layerList .del:active{background:color-mix(in srgb,var(--warn) 24%,transparent)}
+#layerList .del.confirm{position:absolute;top:4px;bottom:4px;right:5px;width:auto;height:auto;min-width:96px;padding:0 12px;background:var(--warn);color:var(--panel);font-size:12px;font-weight:700;letter-spacing:.04em;box-shadow:0 1px 4px rgba(60,45,25,.25)}
+#layerList .del.confirm::before{inset:-4px -5px}
+@media (pointer:coarse){ #layerList li{padding:8px 6px} #layerList .del::before{inset:-9px -7px -9px -5px} #layerList .del.confirm{top:6px;bottom:6px} }
 #layerList .lname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
 #layerList .wetdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--wet);margin-left:5px;vertical-align:1px}
 #layerList input[type=range]{height:18px}
@@ -275,6 +283,9 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
   #tilt .tiltinfo{flex-direction:column;align-items:stretch;gap:4px}
   #tilt .tiltinfo span{font-size:11.5px;text-align:center}
   #tilt .tiltinfo .btn{height:30px;font-size:12px}
+  #layerList li{grid-template-columns:28px 1fr 58px 18px 34px}
+  #layerList .del{width:34px;height:34px}
+  #layerList .del svg{width:19px;height:19px}
   #tilt .mclose{width:28px;height:28px;min-width:28px}
   .row{grid-template-columns:76px 1fr 40px;min-height:34px}
   input[type=range]{height:30px}
@@ -891,7 +902,7 @@ void main(){
   vec2 hs = vec2(hx * u_rot.x - hy * u_rot.y, hx * u_rot.y + hy * u_rot.x);
   float shade = 1. + (hs.x + hs.y) * .1 * u_shade;
   float relief = 1. - (1. - pap) * .03 * u_shade;
-  vec3 base = u_paperCol * shade * relief * (1. - .07 * wet);
+  vec3 base = u_paperCol * shade * relief * (1. - .07 * wet * u_wetOp);   // the damp darkening belongs to the wet layer: hidden or faded with it
   vec3 col = base;
   vec3 gw = u_gouache * mix(1., shade, .45);
   #define LAYER(T, I) { vec4 l = texture(T, uv); float op = u_op[I]; vec3 A = l.rgb + (u_wetIdx == I ? wetA : vec3(0)); col = mix(col, gw, clamp(l.a, 0., 1.) * op) * exp(-A * op); }
@@ -1377,14 +1388,26 @@ function addLayer(name){
   layerSeq++; layers.push(L); return L;
 }
 function deleteLayer(L){
+  if (stroke) return;
   if (layers.length <= 1) { toast('最後の1枚は削除できません'); return; }
-  const purge = st => st.filter(e => { const hit = e.parts.some(p => p.layer === L || p.owner === L); if (hit) freeEntry(e); return !hit; });
-  undoStack = purge(undoStack); redoStack = purge(redoStack);
+  // the layer moves into the undo history with its wet paint; its GPU memory goes when that entry is dropped.
+  // The paint is listed after the layer: parts are put back last-first, so a redo saves the paint before the layer leaves
+  const wet = simOwner === L ? snapSim() : null;
+  const parts = [takeLayer(L)]; if (wet) parts.push(wet);
+  pushUndo(parts); renderLayers(); dirty = true;
+  toast(`「${L.name}」を削除しました（元に戻せます）`);
+}
+// a layer leaving the document (deleted, or its adding undone) keeps its texture: the history entry holding it owns it
+function takeLayer(L){
+  const at = layers.indexOf(L);
   if (simOwner === L) { clearSim(); simOwner = null; }
-  freeTF(L.tex, L.fbo);
-  layers = layers.filter(x => x !== L);
+  layers.splice(at, 1);
   if (active === L) active = layers[layers.length - 1];
-  renderLayers(); updateUndoUI(); dirty = true;
+  return { kind:'stack', layer:L, at, held:true, bytes:doc.w * doc.h * 8 };
+}
+function putLayer(L, at){
+  layers.splice(Math.min(at, layers.length), 0, L); active = L;
+  return { kind:'stack', layer:L, at, held:false, bytes:0 };
 }
 
 /* ================= simulation ================= */
@@ -1438,7 +1461,11 @@ function snapSim(){
   [fW, fP, fD].forEach(arr => { const t = mkTex(sim.w, sim.h), f = mkFbo([t]); blit(arr[si], f, 0, 0, sim.w, sim.h, 0, 0); s.tex.push(t); s.fbo.push(f); });
   return s;
 }
-function freePart(p){ if (p.kind === 'layer') freeTF(p.t, p.f); else p.tex.forEach((t, i) => freeTF(t, p.fbo[i])); }
+function freePart(p){
+  if (p.kind === 'layer') freeTF(p.t, p.f);
+  else if (p.kind === 'stack') { if (p.held) freeTF(p.layer.tex, p.layer.fbo); }   // a layer still in the document is not the history's to free
+  else p.tex.forEach((t, i) => freeTF(t, p.fbo[i]));
+}
 function freeEntry(e){ e.parts.forEach(freePart); undoBytes -= e.bytes; }
 function clearUndo(){ undoStack.forEach(freeEntry); redoStack.forEach(freeEntry); undoStack = []; redoStack = []; undoBytes = 0; }
 function pushUndo(parts){
@@ -1449,6 +1476,7 @@ function pushUndo(parts){
   updateUndoUI();
 }
 function restorePart(p){
+  if (p.kind === 'stack') return p.held ? putLayer(p.layer, p.at) : takeLayer(p.layer);
   if (p.kind === 'layer') {
     const cur = snapLayer(p.layer, p.x, p.y, p.w, p.h);
     blit(p.f, p.layer.fbo, 0, 0, p.w, p.h, p.x, p.y); freePart(p); return cur;
@@ -1925,15 +1953,17 @@ function readStageBg(){
   dirty = true;
 }
 
+// how strongly a layer shows; its wet paint, gloss and damp paper all follow the same number
+function layerOp(L){ return L && L.visible ? L.opacity : 0; }
 function composite(){
   gl.disable(gl.BLEND); target(null);
   const pp = PAPERS[S.paper];
   const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
     u_doc:[doc.w, doc.h], u_canvas:[canvas.width, canvas.height], u_view:[view.x * DPR, view.y * DPR, view.z * DPR], u_rot:[Math.cos(view.r), Math.sin(view.r)], u_export:0 };
   const op = new Float32Array(8);
-  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = L && L.visible ? L.opacity : 0; }
+  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
   U.u_op = op;
-  U.u_wetOp = simOwner ? (simOwner.visible ? simOwner.opacity : 0) : 1;
+  U.u_wetOp = simOwner ? layerOp(simOwner) : 1;
   U.u_gouache = GOUACHE_WHITE; U.u_wetIdx = simOwner ? layers.indexOf(simOwner) : layers.indexOf(active);
   use(progs.comp, U); drawFull();
 }
@@ -2129,8 +2159,20 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; canvas.style.cursor = ''; } });
 
 /* ================= loop ================= */
-function frame(){
+// the water runs on its own clock, not the screen's: SIM_HZ steps a second whether the display refreshes at 60 or 120 Hz.
+// A frame never runs more than SIM_MAX_STEPS; time it could not cover (a slow device, a tab coming back) is let go, not caught up.
+const SIM_HZ = 120, SIM_MAX_STEPS = 4;
+let simAcc = 0, lastFrameT = 0, tickN = 0, stepsSinceCheck = 0;
+function simTicks(now){
+  const dt = lastFrameT ? (now - lastFrameT) / 1000 : 1 / 60; lastFrameT = now;
+  simAcc += Math.max(0, dt) * SIM_HZ;
+  let n = Math.floor(simAcc);
+  if (n > SIM_MAX_STEPS) { n = SIM_MAX_STEPS; simAcc = 0; } else simAcc -= n;
+  return n;
+}
+function frame(now){
   requestAnimationFrame(frame);
+  const ticks = simTicks(now);
   if (stroke && stroke.tool === 'fpen') {
     // a nib resting on the paper keeps feeding ink into it
     const now = performance.now(), held = now - stroke.holdT - 380;
@@ -2141,20 +2183,22 @@ function frame(){
     emitDab({ x:stroke.last.x, y:stroke.last.y, p:stroke.pSm, tx:0, ty:0 }, true);
   }
   flushDabs();
-  stepTendrils();
-  if (simSteps > 0 && simSteps < 160 && Math.hypot(tilt.x, tilt.y) > .02 && paperMaxH > 2e-3) simSteps = 160;   // water still running on a tilted sheet
-  if (simSteps > 0) {
-    const n = 2;
-    for (let i = 0; i < n; i++) simStep();
-    simSteps -= n;
-    if (!stroke && ++frameN % 45 === 0 && simSteps > 0) checkDryness();
-    if (simSteps <= 0) finalizeDry();
+  let ran = 0;
+  for (let i = 0; i < ticks; i++) {
+    if (++tickN % 2 === 0) stepTendrils();   // threads of ink grow at half the step rate
+    if (simSteps > 0 && simSteps < 160 && Math.hypot(tilt.x, tilt.y) > .02 && paperMaxH > 2e-3) simSteps = 160;   // water still running on a tilted sheet
+    if (simSteps <= 0) continue;
+    simStep(); ran++;
+    if (--simSteps <= 0) finalizeDry();
+  }
+  if (ran) {
+    if (!stroke && (stepsSinceCheck += ran) >= 90) { stepsSinceCheck = 0; if (simSteps > 0) checkDryness(); }
     dirty = true; updateWetUI();
   }
   if (++uiTick % 6 === 0 || simSteps <= 0) updateWetUI();
   if (dirty) { composite(); dirty = false; }
 }
-let wetShown = null, frameN = 0, uiTick = 0;
+let wetShown = null, uiTick = 0;
 let coachQueued = false;
 function updateWetUI(force){
   if (simSteps > 0 && !stroke && !coachQueued && !tipShown('meter')) {
@@ -2196,7 +2240,7 @@ function buildTools(){
     b.innerHTML = ICONS[t] + `<span>${TOOLS[t].short || TOOLS[t].label}</span>`;
     b.addEventListener('click', () => {
       if (isNarrow() && noteOpen) setNote(false);
-      if (S.tool === t && isNarrow()) { togglePanel('props'); return; }
+      if (S.tool === t) { togglePanel('props'); return; }
       selectTool(t);
     });
     nav.appendChild(b);
@@ -2603,31 +2647,55 @@ function syncSettings(){ $$('#paperSeg button').forEach(b => b.setAttribute('ari
 const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.5 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4.4-1"/></svg>';
 const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+// rows are kept and updated in place: a redraw from the paint drying or a stroke ending never swaps a button out from under a press
+const layerRows = new Map();
+// the bin tapped once; the next tap on it deletes. A press anywhere else calls it off — no timer,
+// so the wide button can never vanish just as it is tapped and let the tap fall on the slider underneath
+let armedDel = null;
+function armDelete(del){
+  disarmDelete();
+  armedDel = del; del.classList.add('confirm'); del.textContent = '削除する'; del.setAttribute('aria-label', 'もう一度押すと削除します');
+}
+function disarmDelete(){
+  if (armedDel) { armedDel.classList.remove('confirm'); armedDel.innerHTML = TRASH; armedDel.setAttribute('aria-label', '削除'); armedDel = null; }
+}
+document.addEventListener('pointerdown', e => { if (armedDel && !armedDel.contains(e.target)) disarmDelete(); }, true);
+function layerRow(L){
+  let li = layerRows.get(L); if (li) return li;
+  li = document.createElement('li');
+  li.innerHTML = `<button class="eye" title="表示/非表示" aria-label="表示切り替え"></button>
+    <span class="lname"></span>
+    <input type="range" min="0" max="100" title="不透明度">
+    <span class="mv"><button class="up" title="上へ" aria-label="上へ">▲</button><button class="dn" title="下へ" aria-label="下へ">▼</button></span>
+    <button class="del" title="レイヤーを削除" aria-label="削除">${TRASH}</button>`;
+  li.addEventListener('click', ev => { if (ev.target.closest('button,input')) return; active = L; renderLayers(); });
+  li.querySelector('.eye').addEventListener('click', () => { L.visible = !L.visible; dirty = true; renderLayers(); });
+  const move = d => { const i = layers.indexOf(L), j = i + d; if (j < 0 || j >= layers.length) return; layers[i] = layers[j]; layers[j] = L; dirty = true; renderLayers(); };
+  li.querySelector('.up').addEventListener('click', () => move(1)); li.querySelector('.dn').addEventListener('click', () => move(-1));
+  li.querySelector('input').addEventListener('input', ev => { L.opacity = ev.target.value / 100; dirty = true; markChanged(); });
+  const del = li.querySelector('.del');
+  del.addEventListener('click', () => { if (del === armedDel) { disarmDelete(); deleteLayer(L); } else armDelete(del); });
+  layerRows.set(L, li); return li;
+}
 function renderLayers(){
   markChanged();
-  const ul = $('#layerList'); ul.innerHTML = '';
-  [...layers].reverse().forEach(L => {
-    const li = document.createElement('li'); if (L === active) li.className = 'on';
-    const wet = L === simOwner && simHasContent && simSteps > 0;
-    li.innerHTML = `<button class="eye" title="表示/非表示" aria-label="表示切り替え">${L.visible ? EYE : EYE_OFF}</button>
-      <span class="lname">${L.name}${wet ? '<span class="wetdot" title="濡れています"></span>' : ''}</span>
-      <input type="range" min="0" max="100" value="${Math.round(L.opacity * 100)}" title="不透明度" aria-label="${L.name}の不透明度">
-      <span class="mv"><button class="up" title="上へ" aria-label="上へ">▲</button><button class="dn" title="下へ" aria-label="下へ">▼</button></span>
-      <button class="del" title="レイヤーを削除" aria-label="削除">${TRASH}</button>`;
-    li.addEventListener('click', ev => { if (ev.target.closest('button,input')) return; active = L; renderLayers(); });
-    li.querySelector('.eye').addEventListener('click', () => { L.visible = !L.visible; dirty = true; renderLayers(); });
-    const idx = layers.indexOf(L);
-    const up = li.querySelector('.up'), dn = li.querySelector('.dn');
-    up.disabled = idx === layers.length - 1; dn.disabled = idx === 0;
-    const move = d => { const j = idx + d; if (j < 0 || j >= layers.length) return; layers[idx] = layers[j]; layers[j] = L; dirty = true; renderLayers(); };
-    up.addEventListener('click', () => move(1)); dn.addEventListener('click', () => move(-1));
-    li.querySelector('input').addEventListener('input', ev => { L.opacity = ev.target.value / 100; dirty = true; markChanged(); });
-    const del = li.querySelector('.del');
-    del.addEventListener('click', () => {
-      if (!del.classList.contains('confirm')) { del.classList.add('confirm'); del.textContent = '削除'; setTimeout(() => { if (del.isConnected) { del.classList.remove('confirm'); del.innerHTML = TRASH; } }, 3000); return; }
-      deleteLayer(L);
-    });
-    ul.appendChild(li);
+  const ul = $('#layerList');
+  for (const [L, li] of layerRows) if (!layers.includes(L)) { if (li.contains(armedDel)) disarmDelete(); li.remove(); layerRows.delete(L); }
+  [...layers].reverse().forEach((L, k) => {
+    const li = layerRow(L), idx = layers.indexOf(L);
+    if (ul.children[k] !== li) ul.insertBefore(li, ul.children[k] || null);
+    li.classList.toggle('on', L === active);
+    const eye = li.querySelector('.eye');
+    if (eye.dataset.on !== String(L.visible)) { eye.dataset.on = L.visible; eye.innerHTML = L.visible ? EYE : EYE_OFF; }
+    const wet = L === simOwner && simHasContent && simSteps > 0, nm = li.querySelector('.lname');
+    if (nm.dataset.k !== L.name + wet) {
+      nm.dataset.k = L.name + wet; nm.textContent = L.name;
+      if (wet) nm.insertAdjacentHTML('beforeend', '<span class="wetdot" title="濡れています"></span>');
+    }
+    const op = li.querySelector('input'), v = Math.round(L.opacity * 100);
+    if (+op.value !== v) op.value = v;
+    op.setAttribute('aria-label', `${L.name}の不透明度`);
+    li.querySelector('.up').disabled = idx === layers.length - 1; li.querySelector('.dn').disabled = idx === 0;
   });
   $('#addLayer').disabled = layers.length >= 8;
 }
@@ -2636,7 +2704,7 @@ function syncPanelBtns(){
   const drawerOpen = $('#colorDrawer').classList.contains('open');
   $('#scrim').hidden = !(isNarrow() && (drawerOpen || ['props', 'layers', 'settings'].some(id => !$('#' + id).hidden)));
 }
-// on phones only one panel is open at a time; on wide screens the tool panel stays put on the left
+// on phones only one panel is open at a time; on wide screens the tool panel sits on the left beside the others
 function togglePanel(id, force){
   const el = $('#' + id), open = force != null ? force : el.hidden;
   if (open && isNarrow() && noteOpen) setNote(false);
@@ -2680,7 +2748,12 @@ $('#themeBtn').addEventListener('click', () => {
 });
 applyTheme();
 
-$('#addLayer').addEventListener('click', () => { const L = addLayer(); if (L) { active = L; renderLayers(); } });
+// adding is undoable too, so undoing a delete can never push the count past 8
+$('#addLayer').addEventListener('click', () => {
+  if (stroke) return;
+  const L = addLayer(); if (!L) return;
+  active = L; pushUndo([{ kind:'stack', layer:L, at:layers.indexOf(L), held:false, bytes:0 }]); renderLayers();
+});
 $('#clearLayer').addEventListener('click', () => {
   if (stroke) return;
   const parts = [snapLayer(active, 0, 0, doc.w, doc.h)];
@@ -2774,8 +2847,8 @@ $('#saveBtn').addEventListener('click', () => {
   const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
     u_doc:[doc.w, doc.h], u_canvas:[doc.w, doc.h], u_view:[0, 0, 1], u_rot:[1, 0], u_export:1 };
   const op = new Float32Array(8);
-  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = L && L.visible ? L.opacity : 0; }
-  U.u_op = op; U.u_wetOp = simOwner ? (simOwner.visible ? simOwner.opacity : 0) : 1;
+  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
+  U.u_op = op; U.u_wetOp = simOwner ? layerOp(simOwner) : 1;
   U.u_gouache = GOUACHE_WHITE; U.u_wetIdx = simOwner ? layers.indexOf(simOwner) : layers.indexOf(active);
   use(progs.comp, U); drawFull();
   const px = new Uint8Array(doc.w * doc.h * 4);
@@ -2854,9 +2927,9 @@ function thumbnail(){
   const pp = PAPERS[S.paper];
   const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
     u_doc:[doc.w, doc.h], u_canvas:[tw, th], u_view:[0, 0, sc], u_rot:[1, 0], u_export:1, u_gouache:GOUACHE_WHITE,
-    u_wetIdx: simOwner ? layers.indexOf(simOwner) : -1, u_wetOp: simOwner ? (simOwner.visible ? simOwner.opacity : 0) : 1 };
+    u_wetIdx: simOwner ? layers.indexOf(simOwner) : -1, u_wetOp: simOwner ? layerOp(simOwner) : 1 };
   const op = new Float32Array(8);
-  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = L && L.visible ? L.opacity : 0; }
+  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
   U.u_op = op; use(progs.comp, U); drawFull();
   const px = new Uint8Array(tw * th * 4); gl.readPixels(0, 0, tw, th, gl.RGBA, gl.UNSIGNED_BYTE, px);
   target(null); freeTF(t, f); dirty = true;
@@ -2902,6 +2975,11 @@ async function restoreDrawing(rec){
   restoring = true;
   try {
     const m = rec.meta;
+    // unpack everything before touching the document: whatever runs during these waits (a key, a timer) only meets the old picture,
+    // and the new one is then built in one go with nothing in between (the same peak memory as saving)
+    const px = [];
+    for (let i = 0; i < m.layers.length; i++) px.push(await unpack(rec.data[i]));
+    const simPx = rec.simData && m.owner >= 0 && m.owner < m.layers.length ? await unpack(rec.simData) : null;
     S.paper = PAPERS[m.paper] ? m.paper : 'cold'; saveSettings();
     createDoc(m.w, m.h, m.q, m.seed);
     while (layers.length < m.layers.length) addLayer();
@@ -2909,14 +2987,12 @@ async function restoreDrawing(rec){
     for (let i = 0; i < layers.length; i++) {
       const L = layers[i], info = m.layers[i];
       L.name = info.name; L.visible = info.visible; L.opacity = info.opacity;
-      const px = await unpack(rec.data[i]);
-      gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, m.w, m.h, gl.RGBA, gl.HALF_FLOAT, px);
+      gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, m.w, m.h, gl.RGBA, gl.HALF_FLOAT, px[i]);
     }
     layerSeq = layers.length + 1;
     active = layers[clamp(m.active, 0, layers.length - 1)] || layers[0];
-    if (rec.simData && m.owner >= 0 && layers[m.owner]) {
-      const px = await unpack(rec.simData);
-      gl.bindTexture(gl.TEXTURE_2D, D[si]); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, sim.w, sim.h, gl.RGBA, gl.HALF_FLOAT, px);
+    if (simPx) {
+      gl.bindTexture(gl.TEXTURE_2D, D[si]); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, sim.w, sim.h, gl.RGBA, gl.HALF_FLOAT, simPx);
       simOwner = layers[m.owner]; simHasContent = true; simSteps = 0;
     }
     syncSettings(); renderLayers(); dirty = true;
