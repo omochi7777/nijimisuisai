@@ -190,6 +190,35 @@ button,input,select{font:inherit;color:inherit}
 .resume small{color:var(--muted);font-size:12px;text-align:center}
 .resume .btn{width:100%}
 .resume .hint{text-align:center}
+.resume .rname{text-align:center;font-size:15px;margin-bottom:-8px}
+.resume.empty #resumeImg,.resume.empty #resumeName,.resume.empty #resumeTime,.resume.empty #resumeGo{display:none}
+.resume.busy{opacity:.6;pointer-events:none}
+.resume.many #resumeImg{max-height:28vh}   /* leave room for the other works below */
+.resume h2{margin:4px 0 8px}
+#worksInfo{margin-top:-4px}
+.works{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.wcard{position:relative}
+.wcard .wopen{display:flex;flex-direction:column;align-items:stretch;gap:3px;width:100%;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;text-align:left}
+.wcard .wopen:hover{border-color:var(--muted)}
+.wcard.here .wopen{border-color:var(--accent);background:var(--active)}
+.wcard img{width:100%;aspect-ratio:4/3;object-fit:contain;border-radius:8px;background:#f4f1ea}
+.wcard .wname{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wcard small{font-size:11px;color:var(--muted);text-align:left}
+.wcard .wdel{position:absolute;top:10px;right:10px;width:30px;height:30px;border:0;border-radius:8px;background:color-mix(in srgb,var(--panel) 88%,transparent);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.wcard .wdel svg{width:16px;height:16px}
+.wcard .wdel:hover{color:var(--warn)}
+.wcard .wdel.confirm{width:auto;padding:0 10px;background:var(--warn);color:var(--panel);font-weight:700;font-size:12px}
+.install{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--active)}
+.install p{margin:0;flex:1 1 220px;display:flex;flex-direction:column;gap:2px}
+.install p .hint{margin:0}
+.install .iacts{display:flex;align-items:center;gap:10px}
+.howsave{border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+.howsave summary{cursor:pointer;font-weight:700;font-size:12.5px;color:var(--accent)}
+.howsave dl{margin:6px 0 2px;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:12px;line-height:1.55}
+.howsave dt{font-weight:700;white-space:nowrap}
+.howsave dd{margin:0}
+.howsave .con{display:block;color:var(--muted)}
+@media (max-width:560px){ .howsave dl{grid-template-columns:1fr} .howsave dd{margin-bottom:4px} }
 
 
 /* start screen: choose the paper */
@@ -606,8 +635,12 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <label class="check"><input type="checkbox" id="runout" checked><span>筆の水切れでかすれる</span></label>
       <div class="divider"></div>
       <div class="ph"><span class="ptitle">保存</span></div>
-      <p class="hint" id="saveInfo">描いた絵は、この端末に1枚だけ自動で保存されます。次に開いたとき「続きから描く」で戻れます。</p>
-      <button class="btn" id="forgetBtn">この端末の保存を消す</button>
+      <p class="hint" id="saveInfo">描いた絵は、この端末の作品一覧に自動で保存されます（何枚でも）。「新しい紙」から作品一覧を開いて、続きを描けます。</p>
+      <div class="install" data-where="settings" hidden>
+        <p><b>ホーム画面に追加</b><span class="hint">全画面・オフラインで使え、作品が消されにくくなります。</span><span class="hint ios">Safari の共有ボタン（□に↑）→「ホーム画面に追加」で追加できます。</span></p>
+        <div class="iacts"><button class="btn primary" data-install>追加する</button></div>
+      </div>
+      <button class="btn" id="forgetBtn">この端末の作品をすべて消す</button>
       <div class="divider"></div>
       <p class="hint">Wacom（Windows）で筆圧が効かないときは、ワコムタブレットのプロパティで「Windows Ink を使う」をオンにしてください。指・マウスは描く速さから筆圧を推定します。</p>
     </section>
@@ -626,14 +659,24 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 <div id="start" hidden>
   <div class="startcard" role="dialog" aria-modal="true" aria-labelledby="stTitle">
     <div class="sthead"><h1 id="stTitle"><span class="mark" aria-hidden="true"></span>にじみ帖</h1><button class="btn icon" id="startClose" title="閉じる" aria-label="閉じる" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="install" data-where="start" hidden>
+      <p><b>ホーム画面に追加しませんか</b><span class="hint">アプリのように全画面で開けて、オフラインでも使えます。作品もブラウザに消されにくくなります。</span><span class="hint ios">Safari の共有ボタン（□に↑）→「ホーム画面に追加」で追加できます。</span></p>
+      <div class="iacts"><button class="btn primary" data-install>追加する</button><button class="more" data-dismiss>今はしない</button></div>
+    </div>
     <div class="resume" id="resume" hidden>
-      <p class="rlead">おかえりなさい。前回の絵が残っています。</p>
-      <img id="resumeImg" alt="前回の絵">
+      <p class="rlead" id="resumeLead">おかえりなさい。前回の絵が残っています。</p>
+      <img id="resumeImg" alt="いちばん新しい作品">
+      <b class="rname" id="resumeName"></b>
       <small id="resumeTime"></small>
       <button class="btn primary big" id="resumeGo">続きから描く</button>
+      <div id="workMore" hidden>
+        <h2>ほかの作品</h2>
+        <ul class="works" id="workGrid"></ul>
+      </div>
+      <small id="worksInfo"></small>
       <button class="btn big" id="toPick">新しい紙に描く</button>
       <button class="more" data-open style="align-self:center">ファイルを開く（.nijimi・画像）</button>
-      <p class="hint">新しい紙に描きはじめると、この絵は上書きされます。残したいときは、続きを開いて「保存」してください。</p>
+      <p class="hint">描いた絵は、この端末の作品一覧に自動で保存されます。ブラウザのデータを消すと消えるので、大事な作品は「保存」から .nijimi ファイルにもしておくと安心です。</p>
     </div>
     <div id="stPick" style="display:flex;flex-direction:column;gap:14px">
     <button class="more" id="backResume" hidden>← 前回の絵に戻る</button>
@@ -665,9 +708,17 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <div class="ph"><span class="ptitle">保存</span><span class="hint" id="outSize"></span></div>
     <img id="outImg" alt="書き出した絵">
     <p class="hint" id="dlHint">ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。</p>
+    <details class="howsave">
+      <summary>どの保存がいい？</summary>
+      <dl>
+        <dt>作品一覧（自動）</dt><dd>何もしなくても、描くたびにこの端末に保存されます。何枚でも残せて、「新しい紙」→ 作品一覧から続きを描けます。<span class="con">ブラウザのデータを消すと消えます。ほかの端末からは見られません。</span></dd>
+        <dt>.nijimi ファイル</dt><dd>レイヤーごと1つのファイルにします。バックアップや、ほかの端末に移す・人に渡すときに。<span class="con">開けるのはにじみ帖だけです。保存するたびに新しいファイルになります。</span></dd>
+        <dt>PNG 画像</dt><dd>1枚の絵として保存します。SNS・印刷・ほかのアプリで使うときに。<span class="con">レイヤーは残らず、続きは描けません。</span></dd>
+      </dl>
+    </details>
     <div class="njrow" id="njRow">
       <div><b>にじみ帖のファイル（.nijimi）</b><p class="hint">レイヤーごと保存します。「新しい紙」→「ファイルを開く」で続きから描けます。</p>
-        <label class="njname"><span>ファイル名</span><input type="text" id="njName" spellcheck="false" autocomplete="off" enterkeyhint="done" maxlength="60"><span>.nijimi</span></label>
+        <label class="njname"><span>名前</span><input type="text" id="njName" spellcheck="false" autocomplete="off" enterkeyhint="done" maxlength="60"><span>.nijimi</span></label>
         <p class="hint" id="njInfo" role="status"></p></div>
       <button class="btn" id="njSave">.nijimi で保存</button>
     </div>
@@ -1401,7 +1452,7 @@ function currentColor(){
 
 let doc = { w:1600, h:1200 }, sim = { w:1600, h:1200 }, simQ = 1;
 let paperTex, paperFbo, paperSeed = Math.random() * 100;
-let layers = [], active = null, layerSeq = 1, docName = '';   // docName: what the picture was last saved or opened as
+let layers = [], active = null, layerSeq = 1, docName = '', curWork = null;   // docName: the picture's name; curWork: its id in the device's works (none until first saved)
 const W = [], P = [], D = [], F = [], simFbo = [], fW = [], fP = [], fD = [], fF = [];
 let si = 0, fi = 0;
 let scratch, scratchF, backup, backupF;
@@ -1440,7 +1491,7 @@ function freeDoc(){
 }
 function createDoc(w, h, q, seed){
   freeDoc();
-  doc = { w, h }; simQ = q; docName = ''; sim = { w:Math.round(w * q), h:Math.round(h * q) };
+  doc = { w, h }; simQ = q; docName = ''; curWork = null; sim = { w:Math.round(w * q), h:Math.round(h * q) };
   paperTex = mkTex(w, h, 'u8mip'); paperFbo = mkFbo([paperTex]);
   paperSeed = seed != null ? seed : Math.random() * 100; genPaper();
   for (let i = 0; i < 2; i++) {
@@ -3129,6 +3180,11 @@ const vault = {
   async get(k){ const db = await this.open(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
   async set(k, v){ const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); },
   async del(k){ const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').delete(k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); },
+  // several keys in one transaction: a work and its card are written (or removed) together or not at all
+  async setMany(o){ const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'), st = t.objectStore('kv'); for (const k in o) st.put(o[k], k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); },
+  async delMany(keys){ const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'), st = t.objectStore('kv'); keys.forEach(k => st.delete(k)); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); },
+  async getRange(prefix){ const db = await this.open(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').getAll(IDBKeyRange.bound(prefix, prefix + '\uffff')); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
+  async keys(prefix){ const db = await this.open(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').getAllKeys(IDBKeyRange.bound(prefix, prefix + '\uffff')); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
 };
 const f32b = new Float32Array(1), u32b = new Uint32Array(f32b.buffer);
 function toHalf(v){ f32b[0] = v; const x = u32b[0], sign = (x >>> 16) & 0x8000, e = ((x >>> 23) & 0xff) - 112; if (e <= 0) return sign; if (e >= 31) return sign | 0x7bff; return sign | (e << 10) | ((x & 0x7fffff) >>> 13); }
@@ -3200,6 +3256,19 @@ function captureDrawing(){
   return { raw, simRaw, meta, thumb: thumbnail() };
 }
 let saveTimer = 0, saving = false, saveGen = 0, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
+const newWorkId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+// before the paper changes to another picture: write the pending save of the one leaving, so its last strokes are kept
+async function flushSave(){
+  while (saving) await new Promise(r => setTimeout(r, 50));
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = 0; await saveDrawing(); }
+}
+// ask the browser not to clear the works when space runs low. Only where it answers quietly (Chromium, or an installed app):
+// elsewhere it would pop up a question nobody expects
+let storageAsked = false;
+function keepStorage(){
+  if (storageAsked || !navigator.storage || !navigator.storage.persist || !(navigator.userAgentData || isStandalone())) return;
+  storageAsked = true; navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => {});
+}
 function markChanged(){
   if (!docReady || restoring || !vaultOK) return;
   clearTimeout(saveTimer); saveTimer = setTimeout(saveDrawing, 2500);
@@ -3211,12 +3280,18 @@ async function saveDrawing(){
   const gen = saveGen;   // bumped when the save is deleted: a save still compressing must not bring it back
   try {
     const { raw, simRaw, meta, thumb } = captureDrawing();
+    if (!curWork) curWork = newWorkId();
+    const id = curWork;   // what was read above belongs to this work, even if another is opened while it compresses
     const data = [];
     for (const r of raw) data.push(await pack(r));
     const simData = simRaw ? await pack(simRaw) : null;
     if (gen !== saveGen) return;
-    await vault.set('drawing', { meta, data, simData, thumb });
-    if (!store.get('tip:saved', false)) { store.set('tip:saved', true); toast('描いた絵は、この端末に自動で保存されます'); }
+    const bytes = data.reduce((a, d) => a + d.buf.byteLength, 0) + (simData ? simData.buf.byteLength : 0);
+    const card = { id, name: meta.name, savedAt: meta.savedAt, w: meta.w, h: meta.h, paper: meta.paper, layers: meta.layers.length, bytes, thumb };
+    await vault.setMany({ ['work:' + id]: { meta, data, simData }, ['info:' + id]: card });
+    const i = works.findIndex(w => w.id === id); if (i >= 0) works.splice(i, 1); works.unshift(card);
+    if (!store.get('tip:saved', false)) { store.set('tip:saved', true); toast('描いた絵は、この端末の作品一覧に自動で保存されます'); }
+    keepStorage();
   } catch (err) {
     console.warn('save failed', err);
     if (err && err.name === 'QuotaExceededError') toast('端末の空き容量が足りず、保存できませんでした');
@@ -3260,39 +3335,100 @@ function applyDrawing({ m, px, simPx }){
   }
   syncSettings(); renderLayers(); dirty = true;
 }
-let savedRec = null;
+let works = [];   // the cards of the works on this device, newest first
+// the one picture the earlier version kept moves into the works once (and is left where it was, for going back)
+async function migrateOld(){
+  if (await vault.get('migrated')) return;
+  const old = await vault.get('drawing');
+  if (old && old.meta) {
+    const id = newWorkId(), m = old.meta, bytes = old.data.reduce((a, d) => a + d.buf.byteLength, 0) + (old.simData ? old.simData.buf.byteLength : 0);
+    await vault.setMany({ ['work:' + id]: { meta:m, data:old.data, simData:old.simData },
+      ['info:' + id]: { id, name: m.name || '', savedAt: m.savedAt || Date.now(), w:m.w, h:m.h, paper:m.paper, layers:m.layers.length, bytes, thumb:old.thumb }, migrated:true });
+  } else await vault.set('migrated', true);
+}
 async function checkSaved(){
   if (!vaultOK) return;
   try {
-    savedRec = await vault.get('drawing');
-    if (!savedRec || !savedRec.meta) { savedRec = null; return; }
-    const d = new Date(savedRec.meta.savedAt), pad = n => String(n).padStart(2, '0');
-    $('#resumeImg').src = savedRec.thumb || '';
-    $('#resumeTime').textContent = `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())} に保存 · ${PAPER_INFO[savedRec.meta.paper] ? PAPER_INFO[savedRec.meta.paper].name : ''}`;
-    if (st.first && !$('#start').hidden) {
-      $('#startWarn').hidden = false; $('#startWarn').textContent = '新しい紙やファイルで描きはじめると、保存されている前回の絵は上書きされます。'; $('#startGo').textContent = '新しい紙で描きはじめる';
+    await migrateOld();
+    works = (await vault.getRange('info:')).sort((a, b) => b.savedAt - a.savedAt);
+    renderWorks();
+    if (works.length && st.first && !$('#start').hidden) {
+      $('#startWarn').hidden = false; $('#startWarn').textContent = '新しい紙で描きはじめても、作品一覧の絵はそのまま残ります。'; $('#startGo').textContent = '新しい紙で描きはじめる';
       showResumeView(true);
     }
   } catch (err) { vaultOK = false; console.warn('storage unavailable', err); }
 }
-$('#resumeGo').addEventListener('click', async () => {
-  if (!savedRec) return;
-  $('#resumeGo').disabled = true; $('#resumeGo').textContent = '読み込み中…';
-  const ok = await restoreDrawing(savedRec);
-  $('#resumeGo').disabled = false; $('#resumeGo').textContent = '続きから描く';
-  closeStart(); docReady = true;
-  if (ok) toast('前回の続きから描けます');
-});
+const workTitle = w => w.name || '無題';
+function workWhen(w){ const d = new Date(w.savedAt), pad = n => String(n).padStart(2, '0'); return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function renderWorks(){
+  const top = works[0], here = top && top.id === curWork && docReady;
+  $('#backResume').textContent = `← 作品一覧（${works.length}）`;
+  $('#resume').classList.toggle('empty', !top); $('#resume').classList.toggle('many', works.length > 1);
+  if (top) {
+    $('#resumeImg').src = top.thumb || '';
+    $('#resumeName').textContent = workTitle(top);
+    $('#resumeTime').textContent = `${workWhen(top)} に保存 · ${PAPER_INFO[top.paper] ? PAPER_INFO[top.paper].name : ''} · ${fmtSize(top.bytes || 0)}`;
+    $('#resumeGo').textContent = here ? 'この作品に戻る' : '続きから描く';
+  }
+  $('#resumeLead').textContent = st.first ? 'おかえりなさい。前回の絵が残っています。' : '作品一覧';
+  const total = works.reduce((a, w) => a + (w.bytes || 0), 0);
+  $('#worksInfo').textContent = works.length ? `この端末に ${works.length} 枚（約 ${fmtSize(total)}）` : '';
+  const ul = $('#workGrid'); ul.innerHTML = '';
+  $('#workMore').hidden = works.length < 2;
+  works.slice(1).forEach(w => {
+    const li = document.createElement('li'); li.className = 'wcard' + (w.id === curWork && docReady ? ' here' : '');
+    li.innerHTML = `<button class="wopen"><img alt=""><span class="wname"></span><small></small></button><button class="wdel" title="この作品を消す" aria-label="この作品を消す">${TRASH}</button>`;
+    li.querySelector('img').src = w.thumb || '';
+    li.querySelector('.wname').textContent = workTitle(w);
+    li.querySelector('small').textContent = (w.id === curWork && docReady ? '描いている作品 · ' : '') + `${workWhen(w)} · ${fmtSize(w.bytes || 0)}`;
+    li.querySelector('.wopen').addEventListener('click', () => openWork(w.id));
+    const del = li.querySelector('.wdel');
+    del.hidden = w.id === curWork && docReady;   // the picture on the paper is not deleted from under it
+    del.addEventListener('click', () => { if (del === armedWork) deleteWork(w.id); else armWorkDelete(del); });
+    ul.appendChild(li);
+  });
+}
+// the same two-step bin as the layers: armed until a press anywhere else
+let armedWork = null;
+function armWorkDelete(b){ disarmWorkDelete(); armedWork = b; b.classList.add('confirm'); b.textContent = '消す'; }
+function disarmWorkDelete(){ if (armedWork) { armedWork.classList.remove('confirm'); armedWork.innerHTML = TRASH; armedWork = null; } }
+document.addEventListener('pointerdown', e => { if (armedWork && !armedWork.contains(e.target)) disarmWorkDelete(); }, true);
+async function deleteWork(id){
+  const w = works.find(x => x.id === id); armedWork = null;
+  try { await vault.delMany(['work:' + id, 'info:' + id]); } catch (e) { toast('消せませんでした'); return; }
+  works = works.filter(x => x.id !== id); renderWorks();
+  toast(`「${w ? workTitle(w) : '作品'}」を消しました`);
+}
+let opening = false;
+async function openWork(id){
+  if (opening) return;
+  if (id === curWork && docReady) { closeStart(); return; }
+  opening = true; $('#resume').classList.add('busy');
+  try {
+    await flushSave();
+    const rec = await vault.get('work:' + id), w = works.find(x => x.id === id);
+    if (!rec) { toast('この作品が見つかりませんでした'); works = works.filter(x => x.id !== id); renderWorks(); return; }
+    if (stroke) cancelStroke();
+    const ok = await restoreDrawing(rec);
+    if (ok) curWork = id;
+    closeStart(); docReady = true;
+    if (ok) toast(`「${w ? workTitle(w) : '作品'}」の続きから描けます`);
+  } finally { opening = false; $('#resume').classList.remove('busy'); }
+}
+$('#resumeGo').addEventListener('click', () => { if (works[0]) openWork(works[0].id); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && saveTimer) { clearTimeout(saveTimer); saveDrawing(); } });
 window.addEventListener('pagehide', () => { if (saveTimer) { clearTimeout(saveTimer); saveDrawing(); } });
 let forgetArmed = 0;
 $('#forgetBtn').addEventListener('click', async () => {
   const b = $('#forgetBtn');
-  if (!forgetArmed) { b.textContent = '本当に消す'; b.classList.add('primary'); forgetArmed = setTimeout(() => { forgetArmed = 0; b.textContent = 'この端末の保存を消す'; b.classList.remove('primary'); }, 3500); return; }
-  clearTimeout(forgetArmed); forgetArmed = 0; b.textContent = 'この端末の保存を消す'; b.classList.remove('primary');
+  if (!forgetArmed) { b.textContent = '本当に消す'; b.classList.add('primary'); forgetArmed = setTimeout(() => { forgetArmed = 0; b.textContent = 'この端末の作品をすべて消す'; b.classList.remove('primary'); }, 3500); return; }
+  clearTimeout(forgetArmed); forgetArmed = 0; b.textContent = 'この端末の作品をすべて消す'; b.classList.remove('primary');
   clearTimeout(saveTimer); saveTimer = 0; saveGen++;
-  try { await vault.del('drawing'); savedRec = null; docReady = false; toast('この端末の保存を消しました。次に描いたときから、また保存されます'); setTimeout(() => { docReady = true; }, 100); }
-  catch (e) { toast('保存を消せませんでした'); }
+  try {
+    const keys = [...await vault.keys('work:'), ...await vault.keys('info:'), 'drawing'];
+    await vault.delMany(keys); works = []; curWork = null; renderWorks();
+    docReady = false; toast('この端末の作品をすべて消しました。次に描いたときから、また保存されます'); setTimeout(() => { docReady = true; }, 100);
+  } catch (e) { toast('消せませんでした'); }
 });
 
 /* ================= .nijimi files: the whole picture, layers and all, to keep anywhere and open again ================= */
@@ -3335,6 +3471,7 @@ let njBusy = false;
 // a name every system accepts: no path or reserved characters, no doubled extension
 function cleanName(v){ return v.replace(/\.nijimi$/i, '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/^[.\s]+|\s+$/g, '').slice(0, 60); }
 $('#njName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#njSave').click(); } });
+$('#njName').addEventListener('change', e => { const v = cleanName(e.target.value); if (v && v !== docName) { docName = v; markChanged(); } });   // the name in the works list too
 $('#njSave').addEventListener('click', async () => {
   if (stroke || njBusy) return;
   const b = $('#njSave'); njBusy = true; b.disabled = true; b.textContent = 'ファイルを作っています…';
@@ -3359,6 +3496,7 @@ $('#njSave').addEventListener('click', async () => {
 });
 async function openNijimiFile(file){
   let d;
+  await flushSave();
   restoring = true;
   try { d = await decodeDrawing(await readNijimi(file)); }
   catch (err) {
@@ -3371,7 +3509,7 @@ async function openNijimiFile(file){
   catch (err) { console.error(err); toast('メモリが足りず開けませんでした。新しい紙で始めます'); createDoc(1200, 1600, simQ); }
   finally { restoring = false; }
   docName = cleanName(file.name.replace(/\.[^.]+$/, ''));   // saving again offers the same name
-  closeStart(); docReady = true; markChanged();
+  closeStart(); docReady = true; markChanged();   // it becomes a new work in the list
   toast(`「${file.name}」を開きました`);
 }
 
@@ -3460,10 +3598,12 @@ $('#imgPaper').addEventListener('click', () => { imgAdj.paper = !imgAdj.paper; d
 $('#imgBright').addEventListener('input', e => { imgAdj.bright = +e.target.value; drawImgPreview(); });
 $('#imgContrast').addEventListener('input', e => { imgAdj.contrast = +e.target.value; drawImgPreview(); });
 $('#imgReset').addEventListener('click', () => { Object.assign(imgAdj, { paper:false, bright:0, contrast:0 }); drawImgPreview(); });
-$$('#imgDlg [data-mode]').forEach(b => b.addEventListener('click', () => {
+$$('#imgDlg [data-mode]').forEach(b => b.addEventListener('click', async () => {
   const p = imgPick; if (!p) return;
   const lut = adjLuts();
-  if (p.fresh) $('#startGo').click();   // the paper and size picked on the start screen
+  imgPick = null; $('#imgDlg').hidden = true;   // the bitmap stays open until it is placed
+  if (p.fresh) await newPaper();   // the paper and size picked on the start screen
+  imgPick = p;
   const placed = importImage(p.bmp, b.dataset.mode, p.name, lut);
   closeImgDlg();
   if (placed) xfStart(placed.L, placed.box);   // straight into moving it: where and how big is the next thing to decide
@@ -3481,6 +3621,30 @@ $('#openFile').addEventListener('change', async e => {
   else if (looksLikeImage(f)) pickImage(f, true);
   else toast('開けるのは、にじみ帖のファイル（.nijimi）と画像（PNG・JPG など）です');
 });
+
+/* ================= installing as an app ================= */
+// Chrome / Edge / Android offer an install prompt that the page can trigger; iPhone and iPad only add from Safari's share menu,
+// so there the card explains where to tap. Shown only where it can work, and never once installed.
+const canInstall = !!document.querySelector('link[rel="manifest"]') && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost');
+function isStandalone(){ return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; syncInstallUI(); });
+addEventListener('appinstalled', () => { installEvt = null; syncInstallUI(); toast('ホーム画面に追加しました'); });
+function syncInstallUI(){
+  const can = canInstall && !isStandalone() && (!!installEvt || isIOS);
+  $$('.install').forEach(el => { el.hidden = !can || (el.dataset.where === 'start' && store.get('installLater', false)); });
+  $$('.install [data-install]').forEach(b => { b.hidden = !installEvt; });
+  $$('.install .ios').forEach(t => { t.hidden = !!installEvt; });
+}
+$$('.install [data-install]').forEach(b => b.addEventListener('click', async () => {
+  if (!installEvt) return;
+  const e = installEvt; installEvt = null;
+  try { await e.prompt(); await e.userChoice; } catch (err) {}
+  syncInstallUI();
+}));
+$$('.install [data-dismiss]').forEach(b => b.addEventListener('click', () => { store.set('installLater', true); syncInstallUI(); toast('「設定」からいつでも追加できます'); }));
+syncInstallUI();
 
 /* ================= start screen: choose the paper ================= */
 const PAPER_INFO = {
@@ -3536,19 +3700,22 @@ function buildStart(){
   bind('st_vein', () => S.vein, v => setVein(v));
   bind('st_gran', () => S.gran, v => { S.gran = v; $('#gran').value = v; $('#granV').textContent = v + '%'; saveSettings(); dirty = true; });
   bind('st_dry', () => S.drySpd, v => setDrySpeed(v));
-  $('#startGo').addEventListener('click', () => {
-    const firstRun = st.first;
-    const z = SIZES.find(x => x.k === st.size) || SIZES[0];
-    if (stroke) cancelStroke();
-    S.paper = st.paper; saveSettings();
-    try { createDoc(z.w, z.h, st.q); }
-    catch (err) { console.error(err); toast('メモリが足りないため、小さめ・軽量の紙にしました'); createDoc(1000, 750, .5); }
-    syncSettings(); closeStart(); docReady = true;
-    toast(firstRun && isNarrow() ? '道具をもう一度タップで太さなどの調整、右上の丸で色とパレット' : `${PAPER_INFO[S.paper].name}（${z.label}）を用意しました`);
-  });
+  $('#startGo').addEventListener('click', () => newPaper());
   $('#startKeep').addEventListener('click', () => { S.paper = st.paper; saveSettings(); genPaper(); syncSettings(); closeStart(); markChanged(); toast(`紙の質感を「${PAPER_INFO[S.paper].name}」に変えました`); });
   $('#startClose').addEventListener('click', closeStart);
   $('#start').addEventListener('pointerdown', e => { if (e.target.id === 'start' && !st.first) closeStart(); });
+}
+// a fresh sheet with the paper and size picked on the start screen
+async function newPaper(){
+  const firstRun = st.first;
+  await flushSave();   // the picture leaving keeps its last strokes in the works
+  const z = SIZES.find(x => x.k === st.size) || SIZES[0];
+  if (stroke) cancelStroke();
+  S.paper = st.paper; saveSettings();
+  try { createDoc(z.w, z.h, st.q); }
+  catch (err) { console.error(err); toast('メモリが足りないため、小さめ・軽量の紙にしました'); createDoc(1000, 750, .5); }
+  syncSettings(); closeStart(); docReady = true;
+  toast(firstRun && isNarrow() ? '道具をもう一度タップで太さなどの調整、右上の丸で色とパレット' : `${PAPER_INFO[S.paper].name}（${z.label}）を用意しました`);
 }
 function syncStart(){
   $$('#paperCards .pcard').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === st.paper)));
@@ -3562,16 +3729,17 @@ function openStart(first){
     const cur = SIZES.find(z => z.w === doc.w && z.h === doc.h); if (cur) st.size = cur.k; st.q = simQ;
   }
   $('#startClose').hidden = first; $('#startKeep').hidden = first; $('#startWarn').hidden = first; $('#resume').hidden = true;
-  $('#startWarn').textContent = '新しい紙にしたりファイルを開いたりすると、今の絵は消えます（必要なら先に「保存」してください）。'; $('#startGo').classList.add('primary');
+  $('#startWarn').textContent = '新しい紙にしたりファイルを開いたりしても、今の絵は作品一覧に残ります。'; $('#startGo').classList.add('primary');
   $('#startGo').textContent = first ? 'この紙で描きはじめる' : '新しい紙で描きはじめる';
   ['props', 'layers', 'settings', 'tilt'].forEach(k => { if (isNarrow() || k === 'settings' || k === 'tilt') $('#' + k).hidden = true; }); setDrawer(false, true); syncPanelBtns();
   syncStart(); $('#start').hidden = false;
-  $('#stPick').hidden = false; $('#backResume').hidden = true; $('.startcard').scrollTop = 0;
+  $('#stPick').hidden = false; $('#backResume').hidden = !works.length; renderWorks(); $('.startcard').scrollTop = 0; syncInstallUI();
   setTimeout(() => $('#startGo').focus({ preventScroll:true }), 50);
 }
 // with a saved picture, the start screen opens on it; the paper picker is one step away
 function showResumeView(on){
-  $('#resume').hidden = !on; $('#stPick').hidden = on; $('#backResume').hidden = on || !savedRec;
+  $('#resume').hidden = !on; $('#stPick').hidden = on; $('#backResume').hidden = on || !works.length;
+  if (on) renderWorks();
   $('.startcard').scrollTop = 0;
   if (on) setTimeout(() => $('#resumeGo').focus({ preventScroll:true }), 50);
 }
