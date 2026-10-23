@@ -240,6 +240,14 @@ button,input,select{font:inherit;color:inherit}
 .anchor button{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer;padding:0}
 .anchor button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent)}
 .szinfo{margin:0;font-size:13px;line-height:1.55}
+.szprev{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;border-radius:12px;background:var(--stage)}
+#szPrev{width:100%;height:200px;display:block}
+.szlegend{margin:0;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:center}
+.szlegend .k{display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:6px}
+.szlegend .k.keep{border:2px solid var(--accent);box-sizing:border-box}
+.szlegend .k.add{background:#f4f1ea;border:1px solid var(--line)}
+.szlegend .k.now{border:1px dashed var(--muted);box-sizing:border-box}
+.szlegend .k.cut{background:repeating-linear-gradient(45deg,var(--caution) 0 2px,transparent 2px 5px)}
 .szinfo .bad{color:var(--caution);font-weight:700}
 #sizeBtn{justify-content:space-between}
 #savedStatus .savedok svg{width:20px;height:20px;flex:none}
@@ -806,6 +814,9 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <label class="check" id="szLockRow"><input type="checkbox" id="szLock" checked><span>縦横の比率を保つ</span></label>
     <div class="sizes" id="szChips"></div>
     <div id="szAnchorRow"><p class="hint" style="margin:0 0 4px">いまの絵を置く位置</p><div class="anchor" id="szAnchor"></div></div>
+    <div class="szprev"><canvas id="szPrev" role="img" aria-label="変更後の紙のプレビュー"></canvas>
+      <p class="szlegend" id="szLegend"><span class="k keep"></span>新しい紙 <span class="k add"></span>広がる紙 <span class="k cut"></span>切り取られる所</p>
+      <p class="szlegend" id="szLegendScale" hidden><span class="k keep"></span>新しい紙 <span class="k now"></span>いまの紙の大きさ</p></div>
     <p class="szinfo" id="szInfo" role="status"></p>
     <label class="check"><input type="checkbox" id="szKeep" checked><span>変更前の絵を作品一覧に残す（複製）</span></label>
     <p class="hint">大きさを変えると、元に戻すの履歴は消えます。濡れている絵の具は、乾かして定着させてから変えます。</p>
@@ -3932,6 +3943,7 @@ async function resizePaper(nw, nh, mode, ax, ay, keepCopy){
 
 // the dialog: two ways, the numbers, presets, where the picture sits when paper is added or cut
 const sz = { mode:'scale', ax:.5, ay:.5 };
+let szPic = null;   // the picture as it is now, small, for the preview
 function openSizeDlg(){
   if (stroke) return;
   sz.mode = 'scale'; sz.ax = sz.ay = .5;
@@ -3948,6 +3960,7 @@ function openSizeDlg(){
     b.addEventListener('click', () => { sz.ax = +b.dataset.ax; sz.ay = +b.dataset.ay; syncSizeDlg(); });
     $('#szAnchor').appendChild(b);
   }
+  szPic = new Image(); szPic.onload = () => drawSizePreview(); szPic.src = thumbnail();
   syncSizeDlg(); $('#sizeDlg').hidden = false;
   setTimeout(() => $('#szW').focus({ preventScroll:true }), 30);
 }
@@ -3968,6 +3981,45 @@ function syncSizeDlg(){
     info.textContent = `${doc.w} × ${doc.h} → ${w} × ${h}${pct}。${cut}`;
   }
   $('#szGo').disabled = !ok || same;
+  drawSizePreview();
+}
+// the new sheet over the old one, to scale: where paper is added (plain paper), what is cut (hatched), where the picture lands
+function drawSizePreview(){
+  const cv = $('#szPrev'), r = cv.getBoundingClientRect(); if (!r.width) return;
+  const dpr = Math.min(devicePixelRatio || 1, 2); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, r.width, r.height);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const ow = doc.w, oh = doc.h, w = Math.round(+$('#szW').value), h = Math.round(+$('#szH').value);
+  const valid = w > 0 && h > 0 && w <= 20000 && h <= 20000, scale = sz.mode === 'scale';
+  const nw = valid ? w : ow, nh = valid ? h : oh;
+  // picture position on the new sheet (canvas mode), and the box both fit in
+  // picture position on the new sheet: where the anchor puts it (adding / cutting), or both sheets centred (scaling)
+  const ox = scale ? (nw - ow) / 2 : (nw - ow) * sz.ax, oy = scale ? (nh - oh) / 2 : (nh - oh) * sz.ay;
+  const x0 = Math.min(0, ox), y0 = Math.min(0, oy), x1 = Math.max(nw, ox + ow), y1 = Math.max(nh, oy + oh);
+  const pad = 10, k = Math.min((r.width - pad * 2) / (x1 - x0), (r.height - pad * 2) / (y1 - y0));
+  const bx = (r.width - (x1 - x0) * k) / 2 - x0 * k, by = (r.height - (y1 - y0) * k) / 2 - y0 * k;
+  const X = v => bx + v * k, Y = v => by + v * k;
+  const pic = szPic && szPic.complete && szPic.naturalWidth;
+  if (pic && !scale) {
+    // the picture as it lies now, faint and hatched: whatever the new sheet does not cover below is what gets cut
+    g.save(); g.globalAlpha = .35; g.drawImage(szPic, X(ox), Y(oy), ow * k, oh * k); g.globalAlpha = 1;
+    g.beginPath(); g.rect(X(ox), Y(oy), ow * k, oh * k); g.clip();
+    g.strokeStyle = css('--caution'); g.lineWidth = 1.5;
+    for (let t = -r.height; t < r.width + r.height; t += 6) { g.beginPath(); g.moveTo(t, 0); g.lineTo(t + r.height, r.height); g.stroke(); }
+    g.restore();
+  }
+  g.fillStyle = '#f4f1ea'; g.fillRect(X(0), Y(0), nw * k, nh * k);   // the new sheet: plain paper where it grows
+  if (pic) {
+    if (scale) {
+      g.drawImage(szPic, X(0), Y(0), nw * k, nh * k);
+      g.setLineDash([4, 3]); g.strokeStyle = css('--muted'); g.lineWidth = 1; g.strokeRect(X(ox) + .5, Y(oy) + .5, ow * k - 1, oh * k - 1); g.setLineDash([]);   // the sheet as it is now
+    } else {
+      g.save(); g.beginPath(); g.rect(X(0), Y(0), nw * k, nh * k); g.clip(); g.drawImage(szPic, X(ox), Y(oy), ow * k, oh * k); g.restore();
+      g.setLineDash([4, 3]); g.strokeStyle = css('--muted'); g.lineWidth = 1; g.strokeRect(X(ox) + .5, Y(oy) + .5, ow * k - 1, oh * k - 1); g.setLineDash([]);   // the sheet as it is now
+    }
+  }
+  g.strokeStyle = valid && paperSizeOK(w, h) ? css('--accent') : css('--caution'); g.lineWidth = 2; g.strokeRect(X(0), Y(0), nw * k, nh * k);   // the new sheet's edge
+  $('#szLegend').hidden = scale; $('#szLegendScale').hidden = !scale;
 }
 $$('#szMode').forEach(seg => seg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sz.mode = b.dataset.m; syncSizeDlg(); }));
 // with the ratio locked, one side follows the other
