@@ -228,6 +228,19 @@ button,input,select{font:inherit;color:inherit}
 #lossDlg{position:fixed;inset:0;z-index:53;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
 #lossDlg .sheet{width:min(380px,100%);max-height:100%;overflow-y:auto;box-sizing:border-box;background:var(--panel);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
 .losstitle{font-size:16px;color:var(--caution)}
+/* adding / cutting: the dialog steps aside to the bottom, the stage shows the new sheet */
+#sizeDlg.live{background:none;pointer-events:none;align-items:flex-end;padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
+#sizeDlg.live .sheet{pointer-events:auto;max-height:46vh;box-shadow:0 10px 34px rgba(0,0,0,.35)}
+#sizeDlg.live .szprev{display:none}
+#szCatch{position:absolute;inset:0;z-index:3;cursor:grab;touch-action:none}
+#szFrame{position:absolute;left:0;top:0;transform-origin:0 0;z-index:4;border:2px solid var(--accent);box-sizing:border-box;box-shadow:0 0 0 200vmax rgba(10,10,10,.5);cursor:move;touch-action:none}
+#szFrame.bad{border-color:var(--caution)}
+#szAdd{position:absolute;inset:0;background:#f4f1ea;pointer-events:none}
+#szFrame i{position:absolute;width:14px;height:14px;margin:-8px 0 0 -8px;background:#fff;border:2px solid var(--accent);border-radius:3px;box-sizing:border-box;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+@media (pointer:coarse){ #szFrame i{width:24px;height:24px;margin:-13px 0 0 -13px} }
+#szFrame i[data-h="nw"]{left:0;top:0;cursor:nwse-resize} #szFrame i[data-h="n"]{left:50%;top:0;cursor:ns-resize} #szFrame i[data-h="ne"]{left:100%;top:0;cursor:nesw-resize}
+#szFrame i[data-h="e"]{left:100%;top:50%;cursor:ew-resize} #szFrame i[data-h="se"]{left:100%;top:100%;cursor:nwse-resize} #szFrame i[data-h="s"]{left:50%;top:100%;cursor:ns-resize}
+#szFrame i[data-h="sw"]{left:0;top:100%;cursor:nesw-resize} #szFrame i[data-h="w"]{left:0;top:50%;cursor:ew-resize}
 #sizeDlg{position:fixed;inset:0;z-index:53;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
 #sizeDlg .sheet{width:min(420px,100%);max-height:100%;overflow-y:auto;box-sizing:border-box;background:var(--panel);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
 #sizeDlg .hint{margin:0}
@@ -245,9 +258,8 @@ button,input,select{font:inherit;color:inherit}
 .szlegend{margin:0;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:center}
 .szlegend .k{display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:6px}
 .szlegend .k.keep{border:2px solid var(--accent);box-sizing:border-box}
-.szlegend .k.add{background:#f4f1ea;border:1px solid var(--line)}
 .szlegend .k.now{border:1px dashed var(--muted);box-sizing:border-box}
-.szlegend .k.cut{background:repeating-linear-gradient(45deg,var(--caution) 0 2px,transparent 2px 5px)}
+
 .szinfo .bad{color:var(--caution);font-weight:700}
 #sizeBtn{justify-content:space-between}
 #savedStatus .savedok svg{width:20px;height:20px;flex:none}
@@ -581,6 +593,8 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
   <main id="stage">
     <canvas id="view"></canvas>
     <div id="cursor"></div>
+    <div id="szCatch" hidden></div>
+    <div id="szFrame" hidden aria-label="新しい紙の大きさ（□を動かすと変わります）"><span id="szAdd"></span><i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i><i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i></div>
     <div id="xfBox" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <div id="xfBar" hidden role="toolbar" aria-label="レイヤーの移動・拡大">
       <span class="xftext"><b id="xfName"></b><span class="xfhint">ドラッグで移動・四隅で拡大縮小</span></span>
@@ -815,8 +829,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <div class="sizes" id="szChips"></div>
     <div id="szAnchorRow"><p class="hint" style="margin:0 0 4px">いまの絵を置く位置</p><div class="anchor" id="szAnchor"></div></div>
     <div class="szprev"><canvas id="szPrev" role="img" aria-label="変更後の紙のプレビュー"></canvas>
-      <p class="szlegend" id="szLegend"><span class="k keep"></span>新しい紙 <span class="k add"></span>広がる紙 <span class="k cut"></span>切り取られる所</p>
-      <p class="szlegend" id="szLegendScale" hidden><span class="k keep"></span>新しい紙 <span class="k now"></span>いまの紙の大きさ</p></div>
+      <p class="szlegend"><span class="k keep"></span>新しい紙 <span class="k now"></span>いまの紙の大きさ</p></div>
     <p class="szinfo" id="szInfo" role="status"></p>
     <label class="check"><input type="checkbox" id="szKeep" checked><span>変更前の絵を作品一覧に残す（複製）</span></label>
     <p class="hint">大きさを変えると、元に戻すの履歴は消えます。濡れている絵の具は、乾かして定着させてから変えます。</p>
@@ -2618,7 +2631,7 @@ function frame(now){
     dirty = true; updateWetUI();
   }
   if (++uiTick % 6 === 0 || simSteps <= 0) updateWetUI();
-  if (dirty) { composite(); if (xf) placeXfBox(); dirty = false; }
+  if (dirty) { composite(); if (xf) placeXfBox(); placeSzFrame(); dirty = false; }
 }
 let wetShown = null, uiTick = 0;
 let coachQueued = false;
@@ -3909,8 +3922,8 @@ $('#toWorks').addEventListener('click', () => { $('#modal').hidden = true; openS
 const PAPER_MIN = 300, PAPER_MAX = 2400, PAPER_AREA = 2400 * 1800;
 const paperSizeOK = (w, h) => w >= PAPER_MIN && h >= PAPER_MIN && w <= PAPER_MAX && h <= PAPER_MAX && w * h <= PAPER_AREA;
 // 'scale': the picture grows or shrinks with the sheet. 'canvas': the picture stays as it is; paper is added or cut away,
-// and (ax, ay) say where the picture sits (0 = left / top, .5 = middle, 1 = right / bottom)
-async function resizePaper(nw, nh, mode, ax, ay, keepCopy){
+// and (ox, oy) is where the picture's top-left corner lands on the new sheet (negative: cut on that side)
+async function resizePaper(nw, nh, mode, ox, oy, keepCopy){
   if (stroke || !paperSizeOK(nw, nh)) return false;
   if (xf) xfEnd(true);
   if (keepCopy && curWork) {
@@ -3921,7 +3934,7 @@ async function resizePaper(nw, nh, mode, ax, ay, keepCopy){
   if (simOwner && simHasContent) bakeSim(false);   // the wet paint settles into its layer, which then moves with the rest
   const ow = doc.w, oh = doc.h, scale = mode === 'scale';
   const sx = scale ? nw / ow : 1, sy = scale ? nh / oh : 1;
-  const ox = scale ? 0 : Math.round((nw - ow) * ax), oy = scale ? 0 : Math.round((nh - oh) * ay);
+  if (scale) ox = oy = 0; else { ox = Math.round(ox); oy = Math.round(oy); }
   const lod = Math.max(0, Math.log2(1 / Math.min(sx, sy)));
   const made = layers.map(L => {
     if (lod > 0) { gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.generateMipmap(gl.TEXTURE_2D); }
@@ -3941,98 +3954,169 @@ async function resizePaper(nw, nh, mode, ax, ay, keepCopy){
   return true;
 }
 
-// the dialog: two ways, the numbers, presets, where the picture sits when paper is added or cut
-const sz = { mode:'scale', ax:.5, ay:.5 };
-let szPic = null;   // the picture as it is now, small, for the preview
+// the dialog: two ways, the numbers, presets. Adding / cutting is shown on the sheet itself: a frame for the new sheet
+// with handles, plain paper where it grows, the rest dimmed; frame and numbers follow each other
+const sz = { mode:'scale', ax:.5, ay:.5 };   // ax / ay: the anchor (0, .5, 1), or null once the frame has been dragged freely
+let szPic = null;   // the picture as it is now, small, for the scaling preview
+let szr = null;     // the new sheet in the current sheet's pixels: { l, t, r, b } (adding / cutting)
+let szDrag = null;
 function openSizeDlg(){
   if (stroke) return;
-  sz.mode = 'scale'; sz.ax = sz.ay = .5;
+  if (xf) xfEnd(true);
+  sz.mode = 'scale'; sz.ax = sz.ay = .5; szr = { l:0, t:0, r:doc.w, b:doc.h };
+  ['settings', 'tilt'].forEach(k => { $('#' + k).hidden = true; }); if (isNarrow()) ['props', 'layers'].forEach(k => { $('#' + k).hidden = true; }); syncPanelBtns();   // room for the sheet
   $('#szW').value = doc.w; $('#szH').value = doc.h; $('#szLock').checked = true;
   $('#szKeep').checked = !!curWork; $('#szKeep').closest('label').hidden = !curWork;   // nothing saved yet: nothing to keep a copy of
   $('#szNow').textContent = `いま ${doc.w} × ${doc.h}`;
   $('#szChips').innerHTML = '';
-  SIZES.forEach(z => { const b = document.createElement('button'); b.textContent = `${z.label} ${z.w}×${z.h}`; b.addEventListener('click', () => { $('#szW').value = z.w; $('#szH').value = z.h; syncSizeDlg(); }); $('#szChips').appendChild(b); });
+  SIZES.forEach(z => { const b = document.createElement('button'); b.textContent = `${z.label} ${z.w}×${z.h}`; b.addEventListener('click', () => { $('#szW').value = z.w; $('#szH').value = z.h; sizeTyped(); }); $('#szChips').appendChild(b); });
   $('#szAnchor').innerHTML = '';
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
     const b = document.createElement('button'); b.dataset.ax = c / 2; b.dataset.ay = r / 2;
-    b.title = ['上', '真ん中', '下'][r] + (c === 1 ? '' : ['の左', '', 'の右'][c]); if (r === 1 && c === 1) b.title = '真ん中';
+    b.title = r === 1 && c === 1 ? '真ん中' : ['上', '真ん中', '下'][r] + ['の左', '', 'の右'][c];
     b.setAttribute('aria-label', b.title);
-    b.addEventListener('click', () => { sz.ax = +b.dataset.ax; sz.ay = +b.dataset.ay; syncSizeDlg(); });
+    b.addEventListener('click', () => { sz.ax = +b.dataset.ax; sz.ay = +b.dataset.ay; sizeTyped(true); });
     $('#szAnchor').appendChild(b);
   }
   szPic = new Image(); szPic.onload = () => drawSizePreview(); szPic.src = thumbnail();
-  syncSizeDlg(); $('#sizeDlg').hidden = false;
+  $('#sizeDlg').hidden = false; syncSizeDlg();
   setTimeout(() => $('#szW').focus({ preventScroll:true }), 30);
 }
-function syncSizeDlg(){
+function closeSizeDlg(){
+  $('#sizeDlg').hidden = true; szDrag = null;
+  if ($('#sizeDlg').classList.contains('live')) { $('#sizeDlg').classList.remove('live'); syncSizeLive(); fitView(); }
+}
+// numbers typed (or a preset, or an anchor): the frame follows. With an anchor, the picture keeps that place on the new sheet;
+// after a free drag, the frame's top-left corner stays
+function sizeTyped(refit){
+  const w = Math.round(+$('#szW').value), h = Math.round(+$('#szH').value);
+  if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+    const l = sz.ax == null ? szr.l : -Math.round((w - doc.w) * sz.ax), t = sz.ay == null ? szr.t : -Math.round((h - doc.h) * sz.ay);
+    szr = { l, t, r: l + w, b: t + h };
+  }
+  syncSizeDlg(refit);
+}
+function syncSizeDlg(refit){
   const scale = sz.mode === 'scale', w = Math.round(+$('#szW').value), h = Math.round(+$('#szH').value);
   $$('#szMode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === sz.mode)));
   $('#szModeHint').textContent = scale ? '紙と一緒に、描いた絵も同じ割合で大きく・小さくなります。拡大すると少しぼやけます。'
-    : '描いた絵はそのままで、紙を広げたり、はみ出した部分を切り落としたりします。';
+    : '描いた絵はそのままで、紙を広げたり、はみ出した部分を切り落としたりします。紙の上の枠の □ を動かしても変えられます。';
   $('#szLockRow').hidden = !scale; $('#szAnchorRow').hidden = scale;
   $$('#szAnchor button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.ax === sz.ax && +b.dataset.ay === sz.ay)));
   const info = $('#szInfo'); info.innerHTML = '';
-  let ok = Number.isFinite(w) && Number.isFinite(h) && paperSizeOK(w, h), same = w === doc.w && h === doc.h;
+  const ok = Number.isFinite(w) && Number.isFinite(h) && paperSizeOK(w, h);
+  const same = w === doc.w && h === doc.h && (scale || (szr.l === 0 && szr.t === 0));
   if (!ok) info.append(Object.assign(document.createElement('span'), { className:'bad', textContent:`1辺は ${PAPER_MIN}〜${PAPER_MAX}px、全体で約${Math.round(PAPER_AREA / 1e4)}万画素（${PAPER_MAX}×1800 と同じ）までです。` }));
   else if (same) info.textContent = 'いまと同じ大きさです。';
+  else if (scale) info.textContent = `${doc.w} × ${doc.h} → ${w} × ${h}${Math.abs(w / doc.w - h / doc.h) < .005 ? `（${Math.round(w / doc.w * 100)}%）` : '（縦横の比率が変わります）'}。`;
   else {
-    const pct = scale ? (Math.abs(w / doc.w - h / doc.h) < .005 ? `（${Math.round(w / doc.w * 100)}%）` : '（縦横の比率が変わります）') : '';
-    const cut = !scale && (w < doc.w || h < doc.h) ? ' はみ出した部分は切り落とされます。' : '';
-    info.textContent = `${doc.w} × ${doc.h} → ${w} × ${h}${pct}。${cut}`;
+    const cut = szr.l > 0 || szr.t > 0 || szr.r < doc.w || szr.b < doc.h, grow = szr.l < 0 || szr.t < 0 || szr.r > doc.w || szr.b > doc.h;
+    info.textContent = `${doc.w} × ${doc.h} → ${w} × ${h}。` + (grow ? '明るい紙の所が広がります。' : '') + (cut ? '暗くなった所は切り落とされます。' : '');
   }
   $('#szGo').disabled = !ok || same;
-  drawSizePreview();
+  // adding / cutting happens on the sheet itself; scaling keeps the small picture
+  const live = sz.mode === 'canvas' && !$('#sizeDlg').hidden, was = $('#sizeDlg').classList.contains('live');
+  $('#sizeDlg').classList.toggle('live', live);
+  syncSizeLive();
+  if (live && (!was || refit)) requestAnimationFrame(fitSizeFrame);
+  if (!live && was) fitView();
+  if (!live) drawSizePreview();
+  else $('#szFrame').classList.toggle('bad', !ok);
 }
-// the new sheet over the old one, to scale: where paper is added (plain paper), what is cut (hatched), where the picture lands
+function syncSizeLive(){
+  const live = $('#sizeDlg').classList.contains('live');
+  $('#szFrame').hidden = $('#szCatch').hidden = !live;
+  if (live) placeSzFrame();
+}
+// the frame: placed like the paper (offset, zoom, turn); the plain-paper part is the new sheet minus the old one
+function placeSzFrame(){
+  if (!szr || $('#szFrame').hidden) return;
+  const z = view.z, W = (szr.r - szr.l) * z, H = (szr.b - szr.t) * z, tl = toStage(szr.l, szr.t), el = $('#szFrame');
+  el.style.width = W + 'px'; el.style.height = H + 'px';
+  el.style.transform = `translate(${tl.x}px, ${tl.y}px) rotate(${view.r}rad)`;
+  const cx0 = clamp(-szr.l * z, 0, W), cy0 = clamp(-szr.t * z, 0, H), cx1 = clamp((doc.w - szr.l) * z, 0, W), cy1 = clamp((doc.h - szr.t) * z, 0, H);
+  $('#szAdd').style.clipPath = cx1 > cx0 && cy1 > cy0
+    ? `polygon(evenodd, 0 0, ${W}px 0, ${W}px ${H}px, 0 ${H}px, 0 0, ${cx0}px ${cy0}px, ${cx1}px ${cy0}px, ${cx1}px ${cy1}px, ${cx0}px ${cy1}px, ${cx0}px ${cy0}px)` : 'none';
+}
+// zoom out so the old sheet, the new one and the docked dialog all fit
+function fitSizeFrame(){
+  if (!szr) return;
+  resize();
+  const x0 = Math.min(0, szr.l), y0 = Math.min(0, szr.t), x1 = Math.max(doc.w, szr.r), y1 = Math.max(doc.h, szr.b);
+  const sheet = $('#sizeDlg .sheet').getBoundingClientRect(), under = Math.max(0, stageRect.bottom - sheet.top);
+  // clear of the dialog below and of the side panels still open, as "fit to screen" does
+  const pad = 28, l = !isNarrow() && !$('#props').hidden ? 270 : pad, rr = !isNarrow() && !$('#layers').hidden ? 286 : pad;
+  const aw = Math.max(60, stageRect.width - l - rr), ah = Math.max(60, stageRect.height - under - pad * 2);
+  const ac = Math.abs(Math.cos(view.r)), as = Math.abs(Math.sin(view.r)), bw = x1 - x0, bh = y1 - y0;
+  const z = Math.min(aw / (bw * ac + bh * as), ah / (bw * as + bh * ac));
+  const m = rotV((x0 + bw / 2) * z, (y0 + bh / 2) * z, view.r);
+  view.z = z; view.x = l + aw / 2 - m.x; view.y = pad + ah / 2 - m.y;
+  updateZoomUI(); dirty = true; placeSzFrame();
+}
+// dragging: a handle moves its edges (each side kept within the limits), the frame itself moves the whole new sheet
+function szDown(e, handle){
+  e.preventDefault(); e.stopPropagation();
+  try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+  szDrag = { id:e.pointerId, h:handle, d:toDoc(e.clientX, e.clientY), r:{ ...szr } };
+}
+function szMove(e){
+  const g = szDrag; if (!g || e.pointerId !== g.id) return;
+  const d = toDoc(e.clientX, e.clientY), dx = Math.round(d.x - g.d.x), dy = Math.round(d.y - g.d.y), r = { ...g.r };
+  if (g.h === 'move') { r.l += dx; r.r += dx; r.t += dy; r.b += dy; }
+  else {
+    const side = (lo, hi, v, fromLo) => fromLo ? clamp(v, hi - PAPER_MAX, hi - PAPER_MIN) : clamp(v, lo + PAPER_MIN, lo + PAPER_MAX);
+    if (g.h.includes('w')) r.l = side(r.l, r.r, g.r.l + dx, true);
+    if (g.h.includes('e')) r.r = side(r.l, r.r, g.r.r + dx, false);
+    if (g.h.includes('n')) r.t = side(r.t, r.b, g.r.t + dy, true);
+    if (g.h.includes('s')) r.b = side(r.t, r.b, g.r.b + dy, false);
+  }
+  szr = r; sz.ax = sz.ay = null;   // a free place now: no anchor button is lit
+  $('#szW').value = r.r - r.l; $('#szH').value = r.b - r.t;
+  syncSizeDlg();
+}
+function szUp(e){ if (szDrag && e.pointerId === szDrag.id) szDrag = null; }
+$$('#szFrame i').forEach(h => { h.addEventListener('pointerdown', e => szDown(e, h.dataset.h)); h.addEventListener('pointermove', szMove); h.addEventListener('pointerup', szUp); h.addEventListener('pointercancel', szUp); });
+$('#szFrame').addEventListener('pointerdown', e => { if (!e.target.closest('i')) szDown(e, 'move'); });
+$('#szFrame').addEventListener('pointermove', szMove);
+$('#szFrame').addEventListener('pointerup', szUp); $('#szFrame').addEventListener('pointercancel', szUp);
+// around the frame: drag to move the view, wheel to zoom (the brush and the other tools are put away meanwhile)
+let szPan = null;
+$('#szCatch').addEventListener('pointerdown', e => { e.preventDefault(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} szPan = { id:e.pointerId, x:e.clientX, y:e.clientY, vx:view.x, vy:view.y }; });
+$('#szCatch').addEventListener('pointermove', e => { if (!szPan || e.pointerId !== szPan.id) return; view.x = szPan.vx + e.clientX - szPan.x; view.y = szPan.vy + e.clientY - szPan.y; dirty = true; });
+$('#szCatch').addEventListener('pointerup', () => { szPan = null; });
+$('#szCatch').addEventListener('wheel', e => { e.preventDefault(); const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY; zoomAt(e.clientX - stageRect.left, e.clientY - stageRect.top, Math.exp(-dy * (e.ctrlKey ? .01 : .0015))); }, { passive:false });
+// the new sheet over the old one, to scale (scaling only): both sheets centred, the picture filling the new one
 function drawSizePreview(){
   const cv = $('#szPrev'), r = cv.getBoundingClientRect(); if (!r.width) return;
   const dpr = Math.min(devicePixelRatio || 1, 2); cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, r.width, r.height);
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const ow = doc.w, oh = doc.h, w = Math.round(+$('#szW').value), h = Math.round(+$('#szH').value);
-  const valid = w > 0 && h > 0 && w <= 20000 && h <= 20000, scale = sz.mode === 'scale';
-  const nw = valid ? w : ow, nh = valid ? h : oh;
-  // picture position on the new sheet (canvas mode), and the box both fit in
-  // picture position on the new sheet: where the anchor puts it (adding / cutting), or both sheets centred (scaling)
-  const ox = scale ? (nw - ow) / 2 : (nw - ow) * sz.ax, oy = scale ? (nh - oh) / 2 : (nh - oh) * sz.ay;
+  const valid = w > 0 && h > 0 && w <= 20000 && h <= 20000, nw = valid ? w : ow, nh = valid ? h : oh;
+  const ox = (nw - ow) / 2, oy = (nh - oh) / 2;
   const x0 = Math.min(0, ox), y0 = Math.min(0, oy), x1 = Math.max(nw, ox + ow), y1 = Math.max(nh, oy + oh);
   const pad = 10, k = Math.min((r.width - pad * 2) / (x1 - x0), (r.height - pad * 2) / (y1 - y0));
   const bx = (r.width - (x1 - x0) * k) / 2 - x0 * k, by = (r.height - (y1 - y0) * k) / 2 - y0 * k;
   const X = v => bx + v * k, Y = v => by + v * k;
-  const pic = szPic && szPic.complete && szPic.naturalWidth;
-  if (pic && !scale) {
-    // the picture as it lies now, faint and hatched: whatever the new sheet does not cover below is what gets cut
-    g.save(); g.globalAlpha = .35; g.drawImage(szPic, X(ox), Y(oy), ow * k, oh * k); g.globalAlpha = 1;
-    g.beginPath(); g.rect(X(ox), Y(oy), ow * k, oh * k); g.clip();
-    g.strokeStyle = css('--caution'); g.lineWidth = 1.5;
-    for (let t = -r.height; t < r.width + r.height; t += 6) { g.beginPath(); g.moveTo(t, 0); g.lineTo(t + r.height, r.height); g.stroke(); }
-    g.restore();
-  }
-  g.fillStyle = '#f4f1ea'; g.fillRect(X(0), Y(0), nw * k, nh * k);   // the new sheet: plain paper where it grows
-  if (pic) {
-    if (scale) {
-      g.drawImage(szPic, X(0), Y(0), nw * k, nh * k);
-      g.setLineDash([4, 3]); g.strokeStyle = css('--muted'); g.lineWidth = 1; g.strokeRect(X(ox) + .5, Y(oy) + .5, ow * k - 1, oh * k - 1); g.setLineDash([]);   // the sheet as it is now
-    } else {
-      g.save(); g.beginPath(); g.rect(X(0), Y(0), nw * k, nh * k); g.clip(); g.drawImage(szPic, X(ox), Y(oy), ow * k, oh * k); g.restore();
-      g.setLineDash([4, 3]); g.strokeStyle = css('--muted'); g.lineWidth = 1; g.strokeRect(X(ox) + .5, Y(oy) + .5, ow * k - 1, oh * k - 1); g.setLineDash([]);   // the sheet as it is now
-    }
-  }
-  g.strokeStyle = valid && paperSizeOK(w, h) ? css('--accent') : css('--caution'); g.lineWidth = 2; g.strokeRect(X(0), Y(0), nw * k, nh * k);   // the new sheet's edge
-  $('#szLegend').hidden = scale; $('#szLegendScale').hidden = !scale;
+  g.fillStyle = '#f4f1ea'; g.fillRect(X(0), Y(0), nw * k, nh * k);
+  if (szPic && szPic.complete && szPic.naturalWidth) g.drawImage(szPic, X(0), Y(0), nw * k, nh * k);
+  g.setLineDash([4, 3]); g.strokeStyle = css('--muted'); g.lineWidth = 1; g.strokeRect(X(ox) + .5, Y(oy) + .5, ow * k - 1, oh * k - 1); g.setLineDash([]);   // the sheet as it is now
+  g.strokeStyle = valid && paperSizeOK(w, h) ? css('--accent') : css('--caution'); g.lineWidth = 2; g.strokeRect(X(0), Y(0), nw * k, nh * k);
 }
-$$('#szMode').forEach(seg => seg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sz.mode = b.dataset.m; syncSizeDlg(); }));
-// with the ratio locked, one side follows the other
-$('#szW').addEventListener('input', () => { if (sz.mode === 'scale' && $('#szLock').checked) $('#szH').value = Math.round(+$('#szW').value * doc.h / doc.w); syncSizeDlg(); });
-$('#szH').addEventListener('input', () => { if (sz.mode === 'scale' && $('#szLock').checked) $('#szW').value = Math.round(+$('#szH').value * doc.w / doc.h); syncSizeDlg(); });
-$('#szLock').addEventListener('change', syncSizeDlg);
-$('#szCancel').addEventListener('click', () => { $('#sizeDlg').hidden = true; });
-$('#sizeDlg').addEventListener('click', e => { if (e.target.id === 'sizeDlg') $('#sizeDlg').hidden = true; });
+$$('#szMode').forEach(seg => seg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sz.mode = b.dataset.m; sizeTyped(true); }));
+// with the ratio locked, one side follows the other (scaling)
+$('#szW').addEventListener('input', () => { if (sz.mode === 'scale' && $('#szLock').checked) $('#szH').value = Math.round(+$('#szW').value * doc.h / doc.w); sizeTyped(); });
+$('#szH').addEventListener('input', () => { if (sz.mode === 'scale' && $('#szLock').checked) $('#szW').value = Math.round(+$('#szH').value * doc.w / doc.h); sizeTyped(); });
+['szW', 'szH'].forEach(id => $('#' + id).addEventListener('change', () => { if (sz.mode === 'canvas') fitSizeFrame(); }));   // a typed size settles: bring the whole frame into view
+$('#szLock').addEventListener('change', () => syncSizeDlg());
+$('#szCancel').addEventListener('click', closeSizeDlg);
+$('#sizeDlg').addEventListener('click', e => { if (e.target.id === 'sizeDlg') closeSizeDlg(); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sizeDlg').hidden) { closeSizeDlg(); e.stopImmediatePropagation(); } }, true);
 $('#szGo').addEventListener('click', async () => {
-  const w = Math.round(+$('#szW').value), h = Math.round(+$('#szH').value);
+  const w = Math.round(+$('#szW').value), h = Math.round(+$('#szH').value), canvasMode = sz.mode === 'canvas';
   $('#szGo').disabled = true;
-  const done = await resizePaper(w, h, sz.mode, sz.ax, sz.ay, $('#szKeep').checked && !$('#szKeep').closest('label').hidden);
-  $('#sizeDlg').hidden = true;
+  const done = await resizePaper(w, h, sz.mode, canvasMode ? -szr.l : 0, canvasMode ? -szr.t : 0, $('#szKeep').checked && !$('#szKeep').closest('label').hidden);
+  closeSizeDlg();
   if (done) { syncSizeBtn(); toast(`紙を ${w} × ${h} にしました`); }
 });
 $('#sizeBtn').addEventListener('click', openSizeDlg);
