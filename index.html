@@ -228,6 +228,9 @@ button,input,select{font:inherit;color:inherit}
 #lossDlg{position:fixed;inset:0;z-index:53;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
 #lossDlg .sheet{width:min(380px,100%);max-height:100%;overflow-y:auto;box-sizing:border-box;background:var(--panel);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
 .losstitle{font-size:16px;color:var(--caution)}
+.qbtn{flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:12px;font-weight:700;line-height:1;cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px}
+.qbtn:hover{color:var(--ink);border-color:var(--muted)}
+.qbtn[aria-expanded="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 /* adding / cutting: the dialog steps aside to the bottom, the stage shows the new sheet */
 #sizeDlg.live{background:none;pointer-events:none;align-items:flex-end;padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
 #sizeDlg.live .sheet{pointer-events:auto;max-height:46vh;box-shadow:0 10px 34px rgba(0,0,0,.35)}
@@ -244,7 +247,9 @@ button,input,select{font:inherit;color:inherit}
 #sizeDlg{position:fixed;inset:0;z-index:53;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
 #sizeDlg .sheet{width:min(420px,100%);max-height:100%;overflow-y:auto;box-sizing:border-box;background:var(--panel);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
 #sizeDlg .hint{margin:0}
-#sizeDlg .acts{display:flex;gap:8px;justify-content:flex-end}
+#sizeDlg .acts{display:flex;gap:8px;justify-content:flex-end;margin-left:auto}
+.szhead{gap:8px}
+#szNow{margin-top:-6px}
 .szrow{display:flex;align-items:flex-end;gap:8px}
 .szrow label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);flex:1}
 .szrow input{height:34px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:0 8px;font-size:14px;font-family:var(--font-mono);-webkit-user-select:text;user-select:text;width:100%;box-sizing:border-box}
@@ -439,7 +444,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
   #colorChip .ctext{display:none}
   #colorChip .dot{width:32px;height:32px}
   .swgrid{gap:8px}
-  .brand{margin-right:2px}   /* phones: the mark alone, still the way to the works */
+  .brand{display:none}   /* phones: the bar has no room; the works are reached from 保存 */
   #top .meter{min-width:70px;height:40px;padding:0 10px 0 8px;gap:4px}
   #top .meter .mtext small{font-size:11.5px}
   #top .meter .long{display:none}
@@ -682,14 +687,14 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     </section>
 
     <section id="layers" class="panel" aria-label="レイヤー">
-      <div class="ph"><span class="ptitle">レイヤー</span><span style="display:flex;gap:6px"><button class="btn" id="addLayer" title="レイヤーを追加">＋ 追加</button><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span></div>
+      <div class="ph"><span class="ptitle">レイヤー<button class="qbtn" aria-expanded="false" aria-controls="layersHint" title="説明を見る" aria-label="説明を見る">?</button></span><span style="display:flex;gap:6px"><button class="btn" id="addLayer" title="レイヤーを追加">＋ 追加</button><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span></div>
       <ul id="layerList"></ul>
       <button class="btn" id="clearLayer">選択中のレイヤーを白紙に戻す</button>
       <div class="lyacts">
         <button class="btn" id="imgLayer" title="PNG・JPGなどの画像を新しいレイヤーとして読み込む">画像を読み込む</button>
         <button class="btn" id="xfLayer" title="選択中のレイヤーを動かす・大きさを変える (V)">移動・拡大</button>
       </div>
-      <p class="hint">水彩・鉛筆・インクは透明で、重ねると下の色と混ざって深くなります（減法混色）。ガッシュは不透明なので、上のレイヤーほど手前に来ます。<span style="color:var(--wet)">●</span> は濡れた絵の具が乗っているレイヤーです。</p>
+      <p class="hint" id="layersHint" hidden>水彩・鉛筆・インクは透明で、重ねると下の色と混ざって深くなります（減法混色）。ガッシュは不透明なので、上のレイヤーほど手前に来ます。<span style="color:var(--wet)">●</span> は濡れた絵の具が乗っているレイヤーです。</p>
     </section>
 
     <section id="tilt" class="panel" aria-label="紙の傾き" hidden>
@@ -828,9 +833,11 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 </div>
 <div id="sizeDlg" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="szTitle">
-    <div class="ph"><span class="ptitle" id="szTitle">紙の大きさを変える</span><span class="hint mono" id="szNow"></span></div>
+    <div class="ph szhead"><span class="ptitle" id="szTitle" style="white-space:nowrap">紙の大きさ</span><button class="qbtn" aria-expanded="false" aria-controls="szModeHint szUndoHint" title="説明を見る" aria-label="説明を見る">?</button><span class="acts"><button class="btn" id="szCancel">やめる</button><button class="btn primary" id="szGo">変更する</button></span></div>
+    <span class="hint mono" id="szNow"></span>
     <div class="seg" id="szMode"><button data-m="scale">絵ごと拡大・縮小</button><button data-m="canvas">紙を足す・切る</button></div>
-    <p class="hint" id="szModeHint"></p>
+    <p class="hint" id="szModeHint" hidden></p>
+    <p class="hint" id="szUndoHint" hidden>変えたあとでも「元に戻す」（Ctrl+Z）で、変更前の大きさと絵に戻せます。濡れている絵の具は、乾かして定着させてから変えます。</p>
     <div class="szrow">
       <label>幅<input type="number" id="szW" min="300" max="2400" step="10" inputmode="numeric"></label>
       <span>×</span>
@@ -843,8 +850,6 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <div class="szprev"><canvas id="szPrev" role="img" aria-label="変更後の紙のプレビュー"></canvas>
       <p class="szlegend"><span class="k keep"></span>新しい紙 <span class="k now"></span>いまの紙の大きさ</p></div>
     <p class="szinfo" id="szInfo" role="status"></p>
-    <p class="hint">変えたあとでも「元に戻す」（Ctrl+Z）で、変更前の大きさと絵に戻せます。濡れている絵の具は、乾かして定着させてから変えます。</p>
-    <div class="acts"><button class="btn" id="szCancel">やめる</button><button class="btn primary" id="szGo">変更する</button></div>
   </div>
 </div>
 <div id="lossDlg" hidden>
@@ -4151,6 +4156,13 @@ $('#startSize').addEventListener('click', () => { closeStart(); openSizeDlg(); }
 function syncSizeBtn(){ $('#sizeNow').textContent = `${doc.w}×${doc.h}`; }
 // flat paper
 $('#flatPaper').addEventListener('change', e => { flatPaper = e.target.checked; dirty = true; markChanged(); toast(flatPaper ? 'この作品の紙目を表示しないようにしました（画像の書き出しも同じです）' : 'この作品の紙目を表示するようにしました'); });
+
+// "?" buttons: the longer notes stay folded away until asked for
+$$('.qbtn').forEach(b => b.addEventListener('click', () => {
+  const open = b.getAttribute('aria-expanded') !== 'true';
+  b.setAttribute('aria-expanded', String(open));
+  b.getAttribute('aria-controls').split(' ').forEach(id => { $('#' + id).hidden = !open; });
+}));
 
 /* ================= installing as an app ================= */
 // Chrome / Edge / Android offer an install prompt that the page can trigger; iPhone and iPad only add from Safari's share menu,
