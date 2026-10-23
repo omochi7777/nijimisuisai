@@ -228,6 +228,11 @@ button,input,select{font:inherit;color:inherit}
 #lossDlg{position:fixed;inset:0;z-index:53;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
 #lossDlg .sheet{width:min(380px,100%);max-height:100%;overflow-y:auto;box-sizing:border-box;background:var(--panel);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
 .losstitle{font-size:16px;color:var(--caution)}
+/* the save sheet: the title row stays in view while it scrolls, with the close button at its right */
+.savehead{position:sticky;top:-14px;z-index:2;margin:-14px -14px 0;padding:10px 10px 8px 14px;background:var(--panel);gap:10px}
+.savehead #closeModal{margin-left:auto}
+.pngrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pngrow .hint{margin:0;flex:1 1 200px}
 .phoneonly{display:none!important}
 .qbtn{flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:12px;font-weight:700;line-height:1;cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px}
 .qbtn:hover{color:var(--ink);border-color:var(--muted)}
@@ -816,9 +821,12 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 
 <div id="modal" hidden>
   <div class="sheet">
-    <div class="ph"><span class="ptitle">保存</span><span class="hint" id="outSize"></span></div>
+    <div class="ph savehead"><span class="ptitle">保存</span><span class="hint" id="outSize"></span><button class="btn icon" id="closeModal" title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     <img id="outImg" alt="書き出した絵">
-    <p class="hint" id="dlHint">ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。</p>
+    <div class="pngrow">
+      <a class="btn primary" id="dlLink" download="nijimi.png" href="#">PNGをダウンロード</a>
+      <p class="hint" id="dlHint">ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。</p>
+    </div>
     <div class="savedrow" id="savedRow">
       <div class="savedhead"><b>作品一覧（この端末）</b><button class="more" id="toWorks">作品一覧を開く</button></div>
       <p class="hint" id="savedStatus" role="status"></p>
@@ -839,7 +847,6 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
         <p class="hint" id="njInfo" role="status"></p></div>
       <button class="btn" id="njSave">.nijimi で保存</button>
     </div>
-    <div class="acts"><a class="btn primary" id="dlLink" download="nijimi.png" href="#">PNGをダウンロード</a><button class="btn" id="closeModal">閉じる</button></div>
   </div>
 </div>
 <div id="sizeDlg" hidden>
