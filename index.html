@@ -212,6 +212,17 @@ button,input,select{font:inherit;color:inherit}
 .install p{margin:0;flex:1 1 220px;display:flex;flex-direction:column;gap:2px}
 .install p .hint{margin:0}
 .install .iacts{display:flex;align-items:center;gap:10px}
+.savedrow{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.savedrow .hint{margin:0}
+.savedhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.savedhead .more{padding:0}
+#savedStatus b{color:var(--ink)}
+.wstrip{list-style:none;margin:0;padding:2px 0;display:flex;gap:8px;overflow-x:auto}
+.wstrip li{flex:none;width:76px}
+.wstrip button{display:flex;flex-direction:column;gap:2px;width:100%;padding:3px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}
+.wstrip li.here button{border-color:var(--accent);background:var(--active)}
+.wstrip img{width:100%;aspect-ratio:4/3;object-fit:contain;border-radius:5px;background:#f4f1ea}
+.wstrip span{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .howsave{border:1px solid var(--line);border-radius:10px;padding:6px 10px}
 .howsave summary{cursor:pointer;font-weight:700;font-size:12.5px;color:var(--accent)}
 .howsave dl{margin:6px 0 2px;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:12px;line-height:1.55}
@@ -708,6 +719,12 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <div class="ph"><span class="ptitle">保存</span><span class="hint" id="outSize"></span></div>
     <img id="outImg" alt="書き出した絵">
     <p class="hint" id="dlHint">ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。</p>
+    <div class="savedrow" id="savedRow">
+      <div class="savedhead"><b>作品一覧（この端末）</b><button class="more" id="toWorks">作品一覧を開く</button></div>
+      <p class="hint" id="savedStatus" role="status"></p>
+      <ul class="wstrip" id="savedStrip"></ul>
+      <p class="hint" id="savedUsage"></p>
+    </div>
     <details class="howsave">
       <summary>どの保存がいい？</summary>
       <dl>
@@ -1452,7 +1469,7 @@ function currentColor(){
 
 let doc = { w:1600, h:1200 }, sim = { w:1600, h:1200 }, simQ = 1;
 let paperTex, paperFbo, paperSeed = Math.random() * 100;
-let layers = [], active = null, layerSeq = 1, docName = '', curWork = null;   // docName: the picture's name; curWork: its id in the device's works (none until first saved)
+let layers = [], active = null, layerSeq = 1, docName = '', curWork = null, blankDoc = true;   // blankDoc: a fresh sheet nothing has been done to yet   // docName: the picture's name; curWork: its id in the device's works (none until first saved)
 const W = [], P = [], D = [], F = [], simFbo = [], fW = [], fP = [], fD = [], fF = [];
 let si = 0, fi = 0;
 let scratch, scratchF, backup, backupF;
@@ -1491,7 +1508,7 @@ function freeDoc(){
 }
 function createDoc(w, h, q, seed){
   freeDoc();
-  doc = { w, h }; simQ = q; docName = ''; curWork = null; sim = { w:Math.round(w * q), h:Math.round(h * q) };
+  doc = { w, h }; simQ = q; docName = ''; curWork = null; blankDoc = true; sim = { w:Math.round(w * q), h:Math.round(h * q) };
   paperTex = mkTex(w, h, 'u8mip'); paperFbo = mkFbo([paperTex]);
   paperSeed = seed != null ? seed : Math.random() * 100; genPaper();
   for (let i = 0; i < 2; i++) {
@@ -1603,6 +1620,7 @@ function freeEntry(e){ e.parts.forEach(freePart); undoBytes -= e.bytes; }
 function clearUndo(){ undoStack.forEach(freeEntry); redoStack.forEach(freeEntry); undoStack = []; redoStack = []; undoBytes = 0; }
 function pushUndo(parts){
   if (xf) xfEnd(true);
+  blankDoc = false;   // something was done to the paper: from now on it is a work worth keeping
   const e = { parts, bytes: parts.reduce((a, p) => a + p.bytes, 0) };
   redoStack.forEach(freeEntry); redoStack = [];
   undoStack.push(e); undoBytes += e.bytes;
@@ -3144,6 +3162,7 @@ $('#saveBtn').addEventListener('click', () => {
     $('#outImg').src = lastURL; $('#dlLink').href = lastURL;
     $('#dlLink').download = `nijimi_${fileStamp()}.png`;
     $('#njInfo').textContent = ''; $('#njName').value = docName || `nijimi_${fileStamp()}`;
+    showSaved();
     $('#outSize').textContent = `${doc.w} × ${doc.h} px`;
     // inside the Claude viewer without the download permission, a plain link does nothing: offer long-press / right-click instead
     syncDownloadUI();
@@ -3276,6 +3295,7 @@ function markChanged(){
 async function saveDrawing(){
   if (!docReady || !vaultOK) return;
   if (stroke || saving) { clearTimeout(saveTimer); saveTimer = setTimeout(saveDrawing, 1500); return; }
+  if (!curWork && blankDoc) { saveTimer = 0; return; }   // an untouched sheet does not become an empty work in the list
   saving = true; saveTimer = 0;
   const gen = saveGen;   // bumped when the save is deleted: a save still compressing must not bring it back
   try {
@@ -3319,7 +3339,7 @@ async function restoreDrawing(rec){
 }
 function applyDrawing({ m, px, simPx }){
   S.paper = PAPERS[m.paper] ? m.paper : 'cold'; saveSettings();
-  createDoc(m.w, m.h, m.q, m.seed); docName = typeof m.name === 'string' ? m.name : '';
+  createDoc(m.w, m.h, m.q, m.seed); docName = typeof m.name === 'string' ? m.name : ''; blankDoc = false;
   while (layers.length < m.layers.length) addLayer();
   while (layers.length > m.layers.length) { const L = layers.pop(); freeTF(L.tex, L.fbo); }
   for (let i = 0; i < layers.length; i++) {
@@ -3435,7 +3455,7 @@ $('#forgetBtn').addEventListener('click', async () => {
 // "NIJIMI" 0 <version> | header length (u32, little-endian) | header (JSON) | the parts the header lists, one after another:
 // each layer, then the settled watercolour if any (half-floats, bytes split, gzip), then a small JPEG preview
 const NJ_MAGIC = [78, 73, 74, 73, 77, 73, 0], NJ_VERSION = 1, NJ_MAX_SIDE = 4096;
-function fmtSize(n){ return n < 1048576 ? Math.max(1, Math.round(n / 1024)) + 'KB' : (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + 'MB'; }
+function fmtSize(n){ return n < 1048576 ? Math.max(1, Math.round(n / 1024)) + 'KB' : n < 1073741824 ? (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + 'MB' : (n / 1073741824).toFixed(n < 10737418240 ? 1 : 0) + 'GB'; }
 async function buildNijimi(){
   const { raw, simRaw, meta, thumb } = captureDrawing();
   const parts = [];
@@ -3621,6 +3641,31 @@ $('#openFile').addEventListener('change', async e => {
   else if (looksLikeImage(f)) pickImage(f, true);
   else toast('開けるのは、にじみ帖のファイル（.nijimi）と画像（PNG・JPG など）です');
 });
+
+// in the save sheet: write any pending save first, then say where the picture stands in the works, and how much room they take
+async function showSaved(){
+  const st0 = $('#savedStatus');
+  if (!vaultOK) { st0.textContent = 'このブラウザでは端末に保存できない設定になっています。.nijimi ファイルで保存してください。'; $('#savedStrip').innerHTML = ''; $('#savedUsage').textContent = ''; return; }
+  st0.textContent = '保存しています…';
+  await flushSave();
+  const me = works.find(w => w.id === curWork);
+  if (me) { st0.innerHTML = ''; st0.append('「', Object.assign(document.createElement('b'), { textContent: workTitle(me) }), `」は ${workWhen(me)} に保存済みです（${fmtSize(me.bytes || 0)}）。描くたびに自動で保存されます。`); }
+  else st0.textContent = docReady ? 'まだ何も描いていないので、作品一覧には入っていません。描くと自動で保存されます。' : '';
+  const ul = $('#savedStrip'); ul.innerHTML = '';
+  works.slice(0, 12).forEach(w => {
+    const li = document.createElement('li'); if (w.id === curWork) li.className = 'here';
+    li.innerHTML = '<button><img alt=""><span></span></button>';
+    li.querySelector('img').src = w.thumb || ''; li.querySelector('span').textContent = w.id === curWork ? 'いま描いている作品' : workTitle(w);
+    li.querySelector('button').title = `${workTitle(w)}（${workWhen(w)}）`;
+    li.querySelector('button').addEventListener('click', () => { $('#modal').hidden = true; if (w.id !== curWork) openWork(w.id); });
+    ul.appendChild(li);
+  });
+  const total = works.reduce((a, w) => a + (w.bytes || 0), 0);
+  let usage = `${works.length} 枚・約 ${fmtSize(total)}`;
+  try { const e = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; if (e && e.quota) usage += `（このブラウザで使える量の目安：約 ${fmtSize(e.quota)}）`; } catch (err) {}
+  $('#savedUsage').textContent = usage;
+}
+$('#toWorks').addEventListener('click', () => { $('#modal').hidden = true; openStart(false); showResumeView(true); });
 
 /* ================= installing as an app ================= */
 // Chrome / Edge / Android offer an install prompt that the page can trigger; iPhone and iPad only add from Safari's share menu,
