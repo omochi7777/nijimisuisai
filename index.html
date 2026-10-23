@@ -262,7 +262,16 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 #modal .acts,#imgDlg .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 #modal a.btn{text-decoration:none}
 #imgDlg{z-index:51}   /* above the start screen too: a picture can be opened from there */
-#imgDlg img{max-height:42vh;background:repeating-conic-gradient(#e8e4dc 0 25%,#fff 0 50%) 0 0/16px 16px}
+#imgDlg canvas{display:block;align-self:center;width:auto;height:auto;max-width:100%;max-height:38vh;object-fit:contain;border:1px solid var(--line);background:repeating-conic-gradient(#e8e4dc 0 25%,#fff 0 50%) 0 0/16px 16px}
+.imgadj{display:flex;flex-direction:column;gap:6px}
+.imgadj .row{grid-template-columns:84px 1fr 38px}
+.imgadj .more{padding:0}
+.paperrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.paperrow .hint{margin:0;flex:1 1 160px}
+.paperrow .sw{display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid var(--line);background:#fff}
+#imgPaper[aria-pressed="true"]{background:var(--active);border-color:var(--accent)}
+.njname{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--muted)}
+.njname input{flex:1;min-width:0;height:30px;border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:0 8px;font-size:13px;-webkit-user-select:text;user-select:text}
 .njrow{display:flex;align-items:center;gap:12px;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
 .njrow .hint{margin:2px 0 0}
 .btn.two{height:auto;min-height:46px;padding:6px 14px;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;text-align:left}
@@ -633,7 +642,9 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <img id="outImg" alt="書き出した絵">
     <p class="hint" id="dlHint">ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。</p>
     <div class="njrow" id="njRow">
-      <div><b>にじみ帖のファイル（.nijimi）</b><p class="hint">レイヤーごと保存します。「新しい紙」→「ファイルを開く」で続きから描けます。</p><p class="hint" id="njInfo" role="status"></p></div>
+      <div><b>にじみ帖のファイル（.nijimi）</b><p class="hint">レイヤーごと保存します。「新しい紙」→「ファイルを開く」で続きから描けます。</p>
+        <label class="njname"><span>ファイル名</span><input type="text" id="njName" spellcheck="false" autocomplete="off" enterkeyhint="done" maxlength="60"><span>.nijimi</span></label>
+        <p class="hint" id="njInfo" role="status"></p></div>
       <button class="btn" id="njSave">.nijimi で保存</button>
     </div>
     <div class="acts"><a class="btn primary" id="dlLink" download="nijimi.png" href="#">PNGをダウンロード</a><button class="btn" id="closeModal">閉じる</button></div>
@@ -642,7 +653,13 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 <div id="imgDlg" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="imgTitle">
     <div class="ph"><span class="ptitle" id="imgTitle">画像を重ねる</span><span class="hint" id="imgSize"></span></div>
-    <img id="imgPrev" alt="読み込む画像">
+    <canvas id="imgPrev" role="img" aria-label="読み込む画像（調整後）"></canvas>
+    <div class="imgadj">
+      <div class="paperrow"><button class="btn" id="imgPaper" aria-pressed="false"><i class="sw" id="imgPaperSw"></i>紙の色を抜く</button><span class="hint" id="imgPaperHint"></span></div>
+      <div class="row"><label for="imgBright">明るさ</label><input id="imgBright" type="range" min="-100" max="100" step="1" value="0"><output id="imgBrightV">0</output></div>
+      <div class="row"><label for="imgContrast">コントラスト</label><input id="imgContrast" type="range" min="-100" max="100" step="1" value="0"><output id="imgContrastV">0</output></div>
+      <button class="more" id="imgReset">調整を元に戻す</button>
+    </div>
     <p class="hint">新しいレイヤーとして、紙に収まる大きさで真ん中に置きます。</p>
     <div class="acts">
       <button class="btn two" data-mode="mul"><b>透明に重ねる</b><small>白い所が透けます（線画・下絵向き）</small></button>
@@ -1351,7 +1368,7 @@ function currentColor(){
 
 let doc = { w:1600, h:1200 }, sim = { w:1600, h:1200 }, simQ = 1;
 let paperTex, paperFbo, paperSeed = Math.random() * 100;
-let layers = [], active = null, layerSeq = 1;
+let layers = [], active = null, layerSeq = 1, docName = '';   // docName: what the picture was last saved or opened as
 const W = [], P = [], D = [], F = [], simFbo = [], fW = [], fP = [], fD = [], fF = [];
 let si = 0, fi = 0;
 let scratch, scratchF, backup, backupF;
@@ -1388,7 +1405,7 @@ function freeDoc(){
 }
 function createDoc(w, h, q, seed){
   freeDoc();
-  doc = { w, h }; simQ = q; sim = { w:Math.round(w * q), h:Math.round(h * q) };
+  doc = { w, h }; simQ = q; docName = ''; sim = { w:Math.round(w * q), h:Math.round(h * q) };
   paperTex = mkTex(w, h, 'u8mip'); paperFbo = mkFbo([paperTex]);
   paperSeed = seed != null ? seed : Math.random() * 100; genPaper();
   for (let i = 0; i < 2; i++) {
@@ -2892,7 +2909,7 @@ $('#saveBtn').addEventListener('click', () => {
     lastURL = URL.createObjectURL(blob); lastBlob = blob;
     $('#outImg').src = lastURL; $('#dlLink').href = lastURL;
     $('#dlLink').download = `nijimi_${fileStamp()}.png`;
-    $('#njInfo').textContent = '';
+    $('#njInfo').textContent = ''; $('#njName').value = docName || `nijimi_${fileStamp()}`;
     $('#outSize').textContent = `${doc.w} × ${doc.h} px`;
     // inside the Claude viewer without the download permission, a plain link does nothing: offer long-press / right-click instead
     syncDownloadUI();
@@ -2996,7 +3013,7 @@ function captureDrawing(){
     simRaw = readHalf(f, sim.w, sim.h); freeTF(t, f);
   }
   const meta = { v:1, w:doc.w, h:doc.h, q:simQ, paper:S.paper, seed:paperSeed, active: layers.indexOf(active), owner: simRaw ? layers.indexOf(simOwner) : -1,
-    layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), savedAt: Date.now() };
+    layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), name: docName, savedAt: Date.now() };
   return { raw, simRaw, meta, thumb: thumbnail() };
 }
 let saveTimer = 0, saving = false, saveGen = 0, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
@@ -3044,7 +3061,7 @@ async function restoreDrawing(rec){
 }
 function applyDrawing({ m, px, simPx }){
   S.paper = PAPERS[m.paper] ? m.paper : 'cold'; saveSettings();
-  createDoc(m.w, m.h, m.q, m.seed);
+  createDoc(m.w, m.h, m.q, m.seed); docName = typeof m.name === 'string' ? m.name : '';
   while (layers.length < m.layers.length) addLayer();
   while (layers.length > m.layers.length) { const L = layers.pop(); freeTF(L.tex, L.fbo); }
   for (let i = 0; i < layers.length; i++) {
@@ -3127,21 +3144,27 @@ async function readNijimi(file){
   if (at > buf.byteLength) throw new Error('file is cut short');
   const part = b => ({ raw: h.enc === 'split16', split:true, buf:b });
   const n = h.layers.length, owner = Number.isInteger(h.owner) && h.owner >= 0 && h.owner < n && bufs.length > n ? h.owner : -1;
-  const meta = { w:h.w, h:h.h, q:h.q, paper:h.paper, seed: +h.seed || 0, active: Number.isInteger(h.active) ? h.active : 0, owner,
+  const meta = { name: cleanName(String(h.name || '')), w:h.w, h:h.h, q:h.q, paper:h.paper, seed: +h.seed || 0, active: Number.isInteger(h.active) ? h.active : 0, owner,
     layers: h.layers.map((L, i) => ({ name: String(L && L.name || 'レイヤー ' + (i + 1)).slice(0, 40), visible: !(L && L.visible === false), opacity: L && Number.isFinite(+L.opacity) ? clamp(+L.opacity, 0, 1) : 1 })) };
   return { meta, data: bufs.slice(0, n).map(part), simData: owner >= 0 ? part(bufs[n]) : null };
 }
 let njBusy = false;
+// a name every system accepts: no path or reserved characters, no doubled extension
+function cleanName(v){ return v.replace(/\.nijimi$/i, '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/^[.\s]+|\s+$/g, '').slice(0, 60); }
+$('#njName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#njSave').click(); } });
 $('#njSave').addEventListener('click', async () => {
   if (stroke || njBusy) return;
   const b = $('#njSave'); njBusy = true; b.disabled = true; b.textContent = 'ファイルを作っています…';
   try {
-    const blob = await buildNijimi(), name = `nijimi_${fileStamp()}.nijimi`;
+    const base = cleanName($('#njName').value) || `nijimi_${fileStamp()}`, name = base + '.nijimi';
+    $('#njName').value = base;
+    const blob = await buildNijimi();
     if (dlNS) await dlNS.save({ filename:name, data:blob });   // inside the Claude viewer
     else {
       const u = URL.createObjectURL(blob), a = document.createElement('a');
       a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000);
     }
+    docName = base; markChanged();   // the device save remembers the name too
     $('#njInfo').textContent = `「${name}」を保存しました（${fmtSize(blob.size)}）`;
     toast(`.nijimi で保存しました（${fmtSize(blob.size)}）`);
   } catch (err) {
@@ -3164,6 +3187,7 @@ async function openNijimiFile(file){
   try { if (stroke) cancelStroke(); applyDrawing(d); }
   catch (err) { console.error(err); toast('メモリが足りず開けませんでした。新しい紙で始めます'); createDoc(1200, 1600, simQ); }
   finally { restoring = false; }
+  docName = cleanName(file.name.replace(/\.[^.]+$/, ''));   // saving again offers the same name
   closeStart(); docReady = true; markChanged();
   toast(`「${file.name}」を開きました`);
 }
@@ -3172,7 +3196,7 @@ async function openNijimiFile(file){
 // layers hold absorbance, the way transparent paint darkens the paper: a pixel's colour c becomes -log(c), so white lets everything through.
 // "opaque" also lays the gouache white underneath, so the picture hides what is below it instead of tinting it
 const ABS_LUT = (() => { const t = new Float32Array(256); for (let i = 0; i < 256; i++) t[i] = -Math.log(Math.max(i / 255, .012)); return t; })();   // .012: the same floor as absOf
-function importImage(bmp, mode, name){
+function importImage(bmp, mode, name, lut){
   if (layers.length >= 8) { toast('レイヤーは8枚までです。どれかを消してから読み込んでください'); return; }
   const s = Math.min(doc.w / bmp.width, doc.h / bmp.height), w = Math.max(1, Math.round(bmp.width * s)), h = Math.max(1, Math.round(bmp.height * s));
   const c = document.createElement('canvas'); c.width = doc.w; c.height = doc.h;
@@ -3183,6 +3207,7 @@ function importImage(bmp, mode, name){
   const absOver = (v, a) => -Math.log(Math.max(1 - a * (1 - v / 255), .012));
   for (let i = 0; i < src.length; i += 4) {
     const a8 = src[i + 3]; if (!a8) continue;
+    src[i] = lut[0][src[i]]; src[i + 1] = lut[1][src[i + 1]]; src[i + 2] = lut[2][src[i + 2]];   // the adjustments from the dialog
     if (a8 === 255) { out[i] = ABS_LUT[src[i]]; out[i + 1] = ABS_LUT[src[i + 1]]; out[i + 2] = ABS_LUT[src[i + 2]]; }
     else { const a = a8 / 255; out[i] = absOver(src[i], a); out[i + 1] = absOver(src[i + 1], a); out[i + 2] = absOver(src[i + 2], a); }
     out[i + 3] = opaque ? a8 / 255 : 0;
@@ -3193,25 +3218,69 @@ function importImage(bmp, mode, name){
   toast(`「${name}」を新しいレイヤーに読み込みました（元に戻せます）`);
 }
 const looksLikeImage = file => /^image\//.test(file.type) || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file.name);
-let imgPick = null;   // { bmp, url, name, fresh }: fresh = start a new sheet for it (opened from the start screen)
+let imgPick = null;   // { bmp, name, fresh, prev, pw, ph, paper }: fresh = start a new sheet for it (opened from the start screen)
+const imgAdj = { paper:false, bright:0, contrast:0 };
+// the commonest light colour: on a scanned or photographed drawing, the sheet it was drawn on
+function paperColor(px){
+  const bins = new Map();
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2];
+    if (px[i + 3] < 250 || r + g + b < 384) continue;
+    const k = (r >> 4) << 8 | (g >> 4) << 4 | b >> 4, e = bins.get(k);
+    if (e) { e.n++; e.r += r; e.g += g; e.b += b; } else bins.set(k, { n:1, r, g, b });
+  }
+  let best = null; for (const e of bins.values()) if (!best || e.n > best.n) best = e;
+  return best && best.n > px.length / 4 * .05 ? [best.r / best.n, best.g / best.n, best.b / best.n] : null;
+}
+// one table per channel: the paper colour stretched to white (keeping the colours' proportions), then brightness, then contrast around the middle
+function adjLuts(){
+  const bg = imgAdj.paper && imgPick && imgPick.paper ? imgPick.paper : [255, 255, 255];
+  const k = imgAdj.contrast / 100, f = k >= 0 ? 1 + k * 2 : 1 + k, off = imgAdj.bright / 200;
+  return bg.map(b => { const t = new Uint8ClampedArray(256); for (let i = 0; i < 256; i++) t[i] = Math.round(((Math.min(1, i / b) + off - .5) * f + .5) * 255); return t; });
+}
+function drawImgPreview(){
+  const p = imgPick; if (!p) return;
+  const lut = adjLuts(), src = p.prev, out = new ImageData(p.pw, p.ph), d = out.data;
+  for (let i = 0; i < src.length; i += 4) { d[i] = lut[0][src[i]]; d[i + 1] = lut[1][src[i + 1]]; d[i + 2] = lut[2][src[i + 2]]; d[i + 3] = src[i + 3]; }
+  $('#imgPrev').getContext('2d').putImageData(out, 0, 0);
+  $('#imgPaper').setAttribute('aria-pressed', String(imgAdj.paper));
+  $('#imgBright').value = imgAdj.bright; $('#imgBrightV').textContent = imgAdj.bright;
+  $('#imgContrast').value = imgAdj.contrast; $('#imgContrastV').textContent = imgAdj.contrast;
+}
 async function pickImage(file, fresh){
   let bmp;
   try { bmp = await createImageBitmap(file, { imageOrientation:'from-image' }); }
   catch (err) { console.error(err); toast('この画像は読み込めませんでした'); return; }
   if (!fresh && layers.length >= 8) { bmp.close(); toast('レイヤーは8枚までです。どれかを消してから読み込んでください'); return; }
   closeImgDlg();
-  imgPick = { bmp, url: URL.createObjectURL(file), name: file.name.replace(/\.[^.]+$/, '').slice(0, 20) || '画像', fresh };
-  $('#imgPrev').src = imgPick.url; $('#imgSize').textContent = `${bmp.width} × ${bmp.height} px`;
+  // a small copy for the preview: the sliders recolour it instantly, the full size is worked out only when it is placed
+  const sc = Math.min(1, 720 / bmp.width, 480 / bmp.height), pw = Math.max(1, Math.round(bmp.width * sc)), ph = Math.max(1, Math.round(bmp.height * sc));
+  const cv = $('#imgPrev'); cv.width = pw; cv.height = ph;
+  const g = cv.getContext('2d', { willReadFrequently:true }); g.clearRect(0, 0, pw, ph); g.drawImage(bmp, 0, 0, pw, ph);
+  const prev = g.getImageData(0, 0, pw, ph).data, paper = paperColor(prev);
+  imgPick = { bmp, name: file.name.replace(/\.[^.]+$/, '').slice(0, 20) || '画像', fresh, prev, pw, ph, paper };
+  Object.assign(imgAdj, { paper:false, bright:0, contrast:0 });
+  const tinted = paper && paper.some(v => v < 248);
+  $('#imgPaper').disabled = !tinted;
+  $('#imgPaperSw').style.background = paper ? `rgb(${paper.map(Math.round).join(',')})` : '#fff';
+  $('#imgPaperHint').textContent = !paper ? '地の色が見つかりませんでした' : tinted ? '左の色を地の色とみなして白にします。透明に重ねると、地が透けます' : '地の色はもう白です';
+  $('#imgSize').textContent = `${bmp.width} × ${bmp.height} px`;
+  drawImgPreview();
   $('#imgDlg').hidden = false;
 }
 function closeImgDlg(){
-  if (imgPick) { imgPick.bmp.close(); URL.revokeObjectURL(imgPick.url); imgPick = null; }
-  $('#imgDlg').hidden = true; $('#imgPrev').removeAttribute('src');
+  if (imgPick) { imgPick.bmp.close(); imgPick = null; }
+  $('#imgDlg').hidden = true;
 }
+$('#imgPaper').addEventListener('click', () => { imgAdj.paper = !imgAdj.paper; drawImgPreview(); });
+$('#imgBright').addEventListener('input', e => { imgAdj.bright = +e.target.value; drawImgPreview(); });
+$('#imgContrast').addEventListener('input', e => { imgAdj.contrast = +e.target.value; drawImgPreview(); });
+$('#imgReset').addEventListener('click', () => { Object.assign(imgAdj, { paper:false, bright:0, contrast:0 }); drawImgPreview(); });
 $$('#imgDlg [data-mode]').forEach(b => b.addEventListener('click', () => {
   const p = imgPick; if (!p) return;
+  const lut = adjLuts();
   if (p.fresh) $('#startGo').click();   // the paper and size picked on the start screen
-  importImage(p.bmp, b.dataset.mode, p.name);
+  importImage(p.bmp, b.dataset.mode, p.name, lut);
   closeImgDlg();
 }));
 $('#imgCancel').addEventListener('click', closeImgDlg);
