@@ -1571,7 +1571,7 @@ function freeDoc(){
 }
 function createDoc(w, h, q, seed){
   freeDoc();
-  doc = { w, h }; simQ = q; docName = ''; curWork = null; blankDoc = true; sim = { w:Math.round(w * q), h:Math.round(h * q) };
+  doc = { w, h }; simQ = q; docName = ''; curWork = null; blankDoc = true; nameDirty = false; sim = { w:Math.round(w * q), h:Math.round(h * q) };
   paperTex = mkTex(w, h, 'u8mip'); paperFbo = mkFbo([paperTex]);
   paperSeed = seed != null ? seed : Math.random() * 100; genPaper();
   for (let i = 0; i < 2; i++) {
@@ -3342,14 +3342,15 @@ const newWorkId = () => Date.now().toString(36) + Math.random().toString(36).sli
 // changeSeq counts changes to the picture; savedSeq is the count the last save that reached the device covered.
 // saveError is why the last attempt failed (cleared by the next one that works)
 // keptSeq is the count the last .nijimi file took with it: the changes are safe in that file even if the device could not keep them
-let changeSeq = 0, savedSeq = 0, keptSeq = -1, saveError = null;
+// nameDirty: the name changed since the last save (not a change to the picture, but still to be written before leaving)
+let changeSeq = 0, savedSeq = 0, keptSeq = -1, saveError = null, nameDirty = false;
 const hasUnsaved = () => changeSeq !== savedSeq && !(blankDoc && !curWork);   // an untouched new sheet has nothing to lose
-const settleSaved = () => { savedSeq = changeSeq; saveError = null; };   // a picture just opened or started matches what is stored
+const settleSaved = () => { savedSeq = changeSeq; saveError = null; nameDirty = false; };   // a picture just opened or started matches what is stored
 // before the paper changes to another picture: write the pending save of the one leaving, so its last strokes are kept
 async function flushSave(){
   while (saving) await new Promise(r => setTimeout(r, 50));
   clearTimeout(saveTimer); saveTimer = 0;
-  if (vaultOK && docReady && hasUnsaved()) await saveDrawing();   // also retries a save that failed earlier
+  if (vaultOK && docReady && (hasUnsaved() || nameDirty)) await saveDrawing();   // also retries a save that failed earlier, and a new name
 }
 // nothing would be lost by leaving: all on the device, or all in the .nijimi file just written (or nothing started yet)
 const safeToLeave = () => !docReady || !hasUnsaved() || keptSeq === changeSeq;
@@ -3385,7 +3386,7 @@ function keepStorage(){
 }
 function markChanged(content = true){
   if (!docReady || restoring) return;
-  if (content) changeSeq++;
+  if (content) changeSeq++; else nameDirty = true;
   if (!$('#modal').hidden) renderSavedStatus();   // the save sheet follows along
   if (!vaultOK) return;
   clearTimeout(saveTimer); saveTimer = setTimeout(saveDrawing, 2500);
@@ -3409,7 +3410,7 @@ async function saveDrawing(){
     const card = { id, name: meta.name, savedAt: meta.savedAt, w: meta.w, h: meta.h, paper: meta.paper, layers: meta.layers.length, bytes, thumb };
     await vault.setMany({ ['work:' + id]: { meta, data, simData }, ['info:' + id]: card });
     const i = works.findIndex(w => w.id === id); if (i >= 0) works.splice(i, 1); works.unshift(card);
-    if (id === curWork) { savedSeq = seq; saveError = null; }   // changes made while it compressed are still waiting for the next save
+    if (id === curWork) { savedSeq = seq; saveError = null; if (meta.name === docName) nameDirty = false; }   // changes made while it compressed (a stroke, a new name) wait for the next save
     if (!store.get('tip:saved', false)) { store.set('tip:saved', true); toast('描いた絵は、この端末の作品一覧に自動で保存されます'); }
     keepStorage();
   } catch (err) {
@@ -3817,7 +3818,7 @@ function renderSavedStatus(){
   else if (!vaultOK) line('savedng', WARN, 'この端末には保存できません', `${saveErrorText()}。.nijimi ファイルで保存してください。${inFile}`);
   else if (saveError && hasUnsaved()) line('savedng', WARN, '最新の変更を保存できていません',
     `${saveErrorText()}。下の「.nijimi で保存」でファイルにしてください。いらない作品を削除すると、また保存できることがあります。` + inFile + (me ? `（作品一覧には ${workWhen(me)} の状態が残っています）` : ''));
-  else if (hasUnsaved()) line('savedwait', '', '保存しています…', '最新の変更をこの端末に書き込んでいます。');
+  else if (hasUnsaved() || (nameDirty && me)) line('savedwait', '', '保存しています…', '最新の変更をこの端末に書き込んでいます。');
   else if (me) line('savedok', CHECK, 'この作品は保存済みです', `「${workTitle(me)}」· ${workWhen(me)} に保存 · ${fmtSize(me.bytes || 0)}。描くたびに自動で保存されます。`);
   else st0.textContent = 'まだ何も描いていないので、作品一覧には入っていません。描くと自動で保存されます。';
 }
