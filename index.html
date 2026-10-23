@@ -831,8 +831,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <div class="szprev"><canvas id="szPrev" role="img" aria-label="変更後の紙のプレビュー"></canvas>
       <p class="szlegend"><span class="k keep"></span>新しい紙 <span class="k now"></span>いまの紙の大きさ</p></div>
     <p class="szinfo" id="szInfo" role="status"></p>
-    <label class="check"><input type="checkbox" id="szKeep" checked><span>変更前の絵を作品一覧に残す（複製）</span></label>
-    <p class="hint">大きさを変えると、元に戻すの履歴は消えます。濡れている絵の具は、乾かして定着させてから変えます。</p>
+    <p class="hint">変えたあとでも「元に戻す」（Ctrl+Z）で、変更前の大きさと絵に戻せます。濡れている絵の具は、乾かして定着させてから変えます。</p>
     <div class="acts"><button class="btn" id="szCancel">やめる</button><button class="btn primary" id="szGo">変更する</button></div>
   </div>
 </div>
@@ -1631,17 +1630,14 @@ const TILT_K = .08, TILT_BREACH = 1.4;   // slope per cell at full tilt; depth a
 function dryStepsFull(){ const p = simParams(); return Math.ceil(1.3 / p.evap + 1 / p.evapS); }
 
 /* ================= document ================= */
-function freeDoc(){
-  if (xf) { freeTF(xf.t, xf.f); xf = null; syncXfUI(); }
-  for (const L of layers) freeTF(L.tex, L.fbo);
+// the sheet itself: paper, the water simulation and the scratch space, all the size of the paper. The layers and the history
+// are apart, so the sheet can change size under them (resizing the paper, and undoing that)
+function freeSheet(){
   for (let i = 0; i < 2; i++) { [W, P, D, F].forEach(a => a[i] && gl.deleteTexture(a[i])); [simFbo, fW, fP, fD, fF].forEach(a => a[i] && gl.deleteFramebuffer(a[i])); }
   freeTF(paperTex, paperFbo); freeTF(scratch, scratchF); freeTF(backup, backupF);
-  clearUndo();
-  layers = [];
 }
-function createDoc(w, h, q, seed, off){
-  freeDoc();
-  doc = { w, h }; simQ = q; docName = ''; curWork = null; blankDoc = true; nameDirty = false; sim = { w:Math.round(w * q), h:Math.round(h * q) };
+function allocSheet(w, h, q, seed, off){
+  doc = { w, h }; simQ = q; sim = { w:Math.round(w * q), h:Math.round(h * q) };
   paperTex = mkTex(w, h, 'u8mip'); paperFbo = mkFbo([paperTex]);
   paperSeed = seed != null ? seed : Math.random() * 100; paperOff = off || [0, 0]; genPaper();
   for (let i = 0; i < 2; i++) {
@@ -1649,8 +1645,20 @@ function createDoc(w, h, q, seed, off){
     simFbo[i] = mkFbo([W[i], P[i], D[i]]); fW[i] = mkFbo([W[i]]); fP[i] = mkFbo([P[i]]); fD[i] = mkFbo([D[i]]); fF[i] = mkFbo([F[i]]);
     clearF(simFbo[i]); clearF(fF[i]);
   }
-  si = 0; fi = 0; simOwner = null; simHasContent = false; simSteps = 0; simBoost = 1;
+  si = 0; fi = 0; simOwner = null; simHasContent = false; simSteps = 0; simBoost = 1; tips.length = 0;
   scratch = mkTex(w, h); scratchF = mkFbo([scratch]); backup = mkTex(w, h); backupF = mkFbo([backup]);
+}
+function freeDoc(){
+  if (xf) { freeTF(xf.t, xf.f); xf = null; syncXfUI(); }
+  for (const L of layers) freeTF(L.tex, L.fbo);
+  freeSheet();
+  clearUndo();
+  layers = [];
+}
+function createDoc(w, h, q, seed, off){
+  freeDoc();
+  docName = ''; curWork = null; blankDoc = true; nameDirty = false;
+  allocSheet(w, h, q, seed, off);
   layerSeq = 1;
   addLayer('水彩'); addLayer('線画');
   active = layers[0];
@@ -1747,6 +1755,7 @@ function snapSim(){
 }
 function freePart(p){
   if (p.kind === 'layer') freeTF(p.t, p.f);
+  else if (p.kind === 'sheet') p.texs.forEach(e => freeTF(e.t, e.f));   // the sheets of the other size, held only by the history
   else if (p.kind === 'stack') { if (p.held) freeTF(p.layer.tex, p.layer.fbo); }   // a layer still in the document is not the history's to free
   else p.tex.forEach((t, i) => freeTF(t, p.fbo[i]));
 }
@@ -1763,6 +1772,7 @@ function pushUndo(parts){
 }
 function restorePart(p){
   if (p.kind === 'stack') return p.held ? putLayer(p.layer, p.at) : takeLayer(p.layer);
+  if (p.kind === 'sheet') return swapSheet(p);
   if (p.kind === 'layer') {
     const cur = snapLayer(p.layer, p.x, p.y, p.w, p.h);
     blit(p.f, p.layer.fbo, 0, 0, p.w, p.h, p.x, p.y); freePart(p); return cur;
@@ -3923,35 +3933,39 @@ const PAPER_MIN = 300, PAPER_MAX = 2400, PAPER_AREA = 2400 * 1800;
 const paperSizeOK = (w, h) => w >= PAPER_MIN && h >= PAPER_MIN && w <= PAPER_MAX && h <= PAPER_MAX && w * h <= PAPER_AREA;
 // 'scale': the picture grows or shrinks with the sheet. 'canvas': the picture stays as it is; paper is added or cut away,
 // and (ox, oy) is where the picture's top-left corner lands on the new sheet (negative: cut on that side)
-async function resizePaper(nw, nh, mode, ox, oy, keepCopy){
+// The old sheets are not thrown away: they go into the history as one step, so undo brings back exactly the picture
+// as it was (and every step before it), and they are freed only when that step drops out of the history
+function resizePaper(nw, nh, mode, ox, oy){
   if (stroke || !paperSizeOK(nw, nh)) return false;
   if (xf) xfEnd(true);
-  if (keepCopy && curWork) {
-    await flushSave();
-    if (hasUnsaved()) { toast('いまの絵を保存できていないため、変更前の複製は作れませんでした'); return false; }
-    await duplicateWork(curWork, '（大きさ変更前）');
-  }
-  if (simOwner && simHasContent) bakeSim(false);   // the wet paint settles into its layer, which then moves with the rest
+  if (simOwner && simHasContent) bakeSim(true);   // the wet paint settles into its layer first (a step of its own, so it can come back wet)
   const ow = doc.w, oh = doc.h, scale = mode === 'scale';
   const sx = scale ? nw / ow : 1, sy = scale ? nh / oh : 1;
   if (scale) ox = oy = 0; else { ox = Math.round(ox); oy = Math.round(oy); }
   const lod = Math.max(0, Math.log2(1 / Math.min(sx, sy)));
   const made = layers.map(L => {
-    if (lod > 0) { gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.generateMipmap(gl.TEXTURE_2D); }
+    gl.bindTexture(gl.TEXTURE_2D, L.tex);
+    if (lod > 0) { gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.generateMipmap(gl.TEXTURE_2D); }
     const t = mkTex(nw, nh), f = mkFbo([t]);
     gl.disable(gl.BLEND); target(f);
     use(progs.resample, { u_src:L.tex, u_srcSize:[ow, oh], u_off:[ox, oy], u_scale:[sx, sy], u_lod:lod }); drawFull();
+    gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);   // kept for undo: back to how layers are read
     return { L, t, f };
   });
-  // a fresh document of the new size, then the same layers (names, order, visibility) on their resampled sheets
-  const keep = { layers: layers.slice(), active, layerSeq, docName, curWork, nameDirty };
-  createDoc(nw, nh, simQ, paperSeed, scale ? paperOff : [paperOff[0] + ox, paperOff[1] + oy]);   // frees the old sheets and the history
-  for (const L of layers) freeTF(L.tex, L.fbo);
+  const before = { kind:'sheet', w:ow, h:oh, off:paperOff, texs: layers.map(L => ({ L, t:L.tex, f:L.fbo })), bytes: ow * oh * 8 * layers.length };
   made.forEach(m => { m.L.tex = m.t; m.L.fbo = m.f; });
-  layers = keep.layers; active = keep.active; layerSeq = keep.layerSeq;
-  docName = keep.docName; curWork = keep.curWork; nameDirty = keep.nameDirty; blankDoc = false;
-  renderLayers(); fitView(); dirty = true;   // and it is saved over the same work
+  freeSheet(); allocSheet(nw, nh, simQ, paperSeed, scale ? paperOff : [paperOff[0] + ox, paperOff[1] + oy]);
+  pushUndo([before]);
+  renderLayers(); fitView(); syncSizeBtn(); dirty = true;   // and it is saved over the same work
   return true;
+}
+// undo / redo of a resize: swap the layers' sheets and the sheet itself back
+function swapSheet(p){
+  const cur = { kind:'sheet', w:doc.w, h:doc.h, off:paperOff, texs: p.texs.map(e => ({ L:e.L, t:e.L.tex, f:e.L.fbo })), bytes: doc.w * doc.h * 8 * p.texs.length };
+  p.texs.forEach(e => { e.L.tex = e.t; e.L.fbo = e.f; });
+  freeSheet(); allocSheet(p.w, p.h, simQ, paperSeed, p.off);
+  fitView(); syncSizeBtn();
+  return cur;
 }
 
 // the dialog: two ways, the numbers, presets. Adding / cutting is shown on the sheet itself: a frame for the new sheet
@@ -3966,7 +3980,6 @@ function openSizeDlg(){
   sz.mode = 'scale'; sz.ax = sz.ay = .5; szr = { l:0, t:0, r:doc.w, b:doc.h };
   ['settings', 'tilt'].forEach(k => { $('#' + k).hidden = true; }); if (isNarrow()) ['props', 'layers'].forEach(k => { $('#' + k).hidden = true; }); syncPanelBtns();   // room for the sheet
   $('#szW').value = doc.w; $('#szH').value = doc.h; $('#szLock').checked = true;
-  $('#szKeep').checked = !!curWork; $('#szKeep').closest('label').hidden = !curWork;   // nothing saved yet: nothing to keep a copy of
   $('#szNow').textContent = `いま ${doc.w} × ${doc.h}`;
   $('#szChips').innerHTML = '';
   SIZES.forEach(z => { const b = document.createElement('button'); b.textContent = `${z.label} ${z.w}×${z.h}`; b.addEventListener('click', () => { $('#szW').value = z.w; $('#szH').value = z.h; sizeTyped(); }); $('#szChips').appendChild(b); });
@@ -4115,9 +4128,9 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sizeDlg
 $('#szGo').addEventListener('click', async () => {
   const w = Math.round(+$('#szW').value), h = Math.round(+$('#szH').value), canvasMode = sz.mode === 'canvas';
   $('#szGo').disabled = true;
-  const done = await resizePaper(w, h, sz.mode, canvasMode ? -szr.l : 0, canvasMode ? -szr.t : 0, $('#szKeep').checked && !$('#szKeep').closest('label').hidden);
+  const done = resizePaper(w, h, sz.mode, canvasMode ? -szr.l : 0, canvasMode ? -szr.t : 0);
   closeSizeDlg();
-  if (done) { syncSizeBtn(); toast(`紙を ${w} × ${h} にしました`); }
+  if (done) toast(`紙を ${w} × ${h} にしました（元に戻せます）`);
 });
 $('#sizeBtn').addEventListener('click', openSizeDlg);
 $('#startSize').addEventListener('click', () => { closeStart(); openSizeDlg(); });
