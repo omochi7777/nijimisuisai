@@ -158,6 +158,8 @@ button,input,select{font:inherit;color:inherit}
 .setchips button svg{width:15px;height:15px;color:#d9a400;fill:currentColor}
 #favBtn[aria-pressed="true"]{color:#d9a400;border-color:#d9a400}
 #favBtn[aria-pressed="true"] svg{fill:currentColor}
+#dropBtn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#view.dropping{cursor:crosshair}
 #favEmpty{margin-top:-4px}
 /* making a colour: wheel, sliders, mixing palette */
 .mk{display:flex;flex-direction:column;gap:8px}
@@ -643,6 +645,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
         <span class="swbig" id="swCur"></span>
         <span class="cn"><b id="colorName">ウルトラマリン</b><small id="colorMeta">粒状性 強</small></span>
         <button class="btn icon" id="favBtn" aria-pressed="false" title="お気に入りに登録" aria-label="お気に入りに登録"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3.5 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></button>
+        <button class="btn icon" id="dropBtn" aria-pressed="false" title="スポイト：絵から色を取る（Alt+クリックでも取れます）" aria-label="スポイト：絵から色を取る"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m14 7 3 3"/><path d="M15.5 5.5a2.1 2.1 0 0 1 3 3L17 10l-3-3z"/><path d="M14 7 6.5 14.5 5 19l4.5-1.5L17 10"/></svg></button>
         <input type="color" id="colorPick" title="ブラウザの色選びで作る" aria-label="ブラウザの色選びで色を作る">
       </div>
       <p class="hint" id="colorNote" hidden></p>
@@ -2372,7 +2375,8 @@ function gestureMove(){
 // A file picker that opens while the cursor is hidden keeps it hidden on Windows (seen with both mouse and pen).
 function sysCursor(hide){ canvas.classList.toggle('nocur', hide); if (!hide) cursorEl.style.display = 'none'; }
 function showCursor(ev){
-  if (ev.pointerType === 'touch' || panDrag || spaceDown || handMode) { sysCursor(false); return; }
+  canvas.classList.toggle('dropping', dropping || (ev.altKey && !stroke));
+  if (ev.pointerType === 'touch' || panDrag || spaceDown || handMode || canvas.classList.contains('dropping')) { sysCursor(false); return; }
   canvas.classList.add('nocur');
   const tool = (ev.pointerType === 'pen' && (ev.buttons & 32)) ? 'eraser' : S.tool;
   const r = Math.max(1.5, (S.tools[tool].size / 2) * view.z * (tool === 'gpen' ? .6 : tool === 'fpen' ? .8 : 1));
@@ -2398,6 +2402,8 @@ canvas.addEventListener('pointerdown', e => {
     if (!S.penOnly && isCoarse) { S.penOnly = true; $('#penOnly').checked = true; saveSettings(); toast('ペンを検出しました。指はスクロールと拡大に使います（設定で変更できます）'); }
   }
   if (!isNarrow() && !$('#settings').hidden) { /* keep */ }
+  if (dropDrag) return;
+  if ((dropping || (e.altKey && e.pointerType !== 'touch' && e.button === 0)) && !stroke && !xf) { dropDrag = { id:e.pointerId }; dropAt(e); return; }
   if (xf && xfDown(e)) return;
   if (e.pointerType === 'touch') {
     pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
@@ -2423,6 +2429,7 @@ canvas.addEventListener('pointerdown', e => {
   if (stroke) stroke.pSm = pt.p;
 });
 canvas.addEventListener('pointermove', e => {
+  if (dropDrag) { if (e.pointerId === dropDrag.id) dropAt(e); return; }
   if (xf && xfMove(e)) return;
   if (e.pointerType === 'touch' && pointers.has(e.pointerId)) {
     pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
@@ -2459,6 +2466,7 @@ function fingerTap(e){
   } else lastTap = { t:now, x:e.clientX, y:e.clientY };
 }
 function pointerEnd(e){
+  if (dropDrag) { if (e.pointerId === dropDrag.id) { dropDrag = null; setDropping(false); saveSettings(); rememberColor(); } return; }
   if (xf) xfUp(e);
   if (e.pointerType === 'touch') {
     pointers.delete(e.pointerId);
@@ -2873,6 +2881,40 @@ function setHexColor(hex){
   S.custom = hex; S.customName = '自分で作った色'; S.customGran = .3; S.customWhite = mx > .96 && mx - mn < .05;   // near white behaves like white paint
   saveSettings(); syncProps();
 }
+
+/* ---- the dropper: a colour taken from the picture ---- */
+let dropping = false, dropDrag = null;
+function setDropping(on){
+  dropping = on; $('#dropBtn').setAttribute('aria-pressed', String(on)); canvas.classList.toggle('dropping', on);
+  if (on) { if (isNarrow()) setDrawer(false); toast(isCoarse ? '絵をタップすると、その色を取ります' : '絵をクリックすると、その色を取ります'); }
+}
+// the colour as it looks on the paper, without the light on the paper's bumps; a few pixels averaged so one grain does not decide it
+function sampleColor(cx, cy){
+  const d = toDoc(cx, cy); if (d.x < 0 || d.y < 0 || d.x > doc.w || d.y > doc.h) return null;
+  const N = 7, t = mkTex(N, N, 'u8'), f = mkFbo([t]);
+  flushDabs(); gl.disable(gl.BLEND); target(f);
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:0, u_paperCol:paperCol(), u_bg:stageBg,
+    u_doc:[doc.w, doc.h], u_canvas:[N, N], u_view:[N / 2 - d.x, N / 2 - d.y, 1], u_rot:[1, 0], u_export:1 };
+  const op = new Float32Array(8);
+  for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
+  U.u_op = op; U.u_wetOp = simOwner ? layerOp(simOwner) : 1;
+  U.u_gouache = GOUACHE_WHITE; U.u_wetIdx = simOwner ? layers.indexOf(simOwner) : layers.indexOf(active);
+  use(progs.comp, U); drawFull();
+  const px = new Uint8Array(N * N * 4); gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  target(null); freeTF(t, f); dirty = true;
+  const c = [0, 0, 0];
+  for (let i = 0; i < N * N; i++) for (let k = 0; k < 3; k++) c[k] += px[i * 4 + k] / 255 / (N * N);
+  return c;
+}
+function dropAt(e){
+  const c = sampleColor(e.clientX, e.clientY); if (!c) return;
+  const hex = rgbHex(c), mx = Math.max(...c), mn = Math.min(...c);
+  if (S.custom === hex) return;
+  S.custom = hex; S.customName = 'スポイトの色'; S.customGran = .3; S.customWhite = mx > .96 && mx - mn < .05;   // near white behaves like white paint
+  syncProps();
+}
+$('#dropBtn').addEventListener('click', () => setDropping(!dropping));
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && dropping) setDropping(false); });
 
 /* ================= making a colour: a wheel and sliders (hue, vividness, brightness) ================= */
 const hsv2rgb = (h, s, v) => { const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return [f(5), f(3), f(1)]; };
