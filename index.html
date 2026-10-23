@@ -45,7 +45,8 @@ button,input,select{font:inherit;color:inherit}
 /* top bar */
 #top{background-image:var(--grain);grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:6px max(10px,env(safe-area-inset-right,0px)) 6px max(10px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line);background:var(--chrome);overflow-x:auto;scrollbar-width:none;white-space:nowrap}
 #top::-webkit-scrollbar{display:none}
-.brand{display:flex;align-items:center;gap:8px;margin-right:10px}
+.brand{display:flex;align-items:center;gap:8px;margin-right:10px;flex:none;border:0;background:none;padding:2px 6px 2px 2px;border-radius:12px;cursor:pointer;color:inherit}
+.brand:hover{background:var(--active)}
 .mark{display:block;flex:none;width:28px;height:28px;border-radius:50%;background:var(--mark) center/cover no-repeat;box-shadow:0 1px 2px rgba(60,45,25,.18)}
 .brand .name{font-family:var(--font-hand);font-weight:600;font-size:17px;letter-spacing:.06em}
 .spacer{flex:1}
@@ -193,7 +194,36 @@ button,input,select{font:inherit;color:inherit}
 .resume .rname{text-align:center;font-size:15px;margin-bottom:-8px}
 .resume.empty #resumeImg,.resume.empty #resumeName,.resume.empty #resumeTime,.resume.empty #resumeGo{display:none}
 .resume.busy{opacity:.6;pointer-events:none}
-.resume.many #resumeImg{max-height:28vh}   /* leave room for the other works below */
+.resume.many #resumeImg{max-height:28vh}   /* leave room for the works below */
+.resume.mid #resumeLead,.resume.mid #resumeImg,.resume.mid #resumeName,.resume.mid #resumeTime,.resume.mid #resumeGo{display:none}   /* opened while drawing: just the list */
+.workhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.workhead .more{padding:0}
+.workhead h2{margin:4px 0 8px}
+.works.selecting .wcard.here{opacity:.45}
+.wcard .wtick{position:absolute;top:10px;left:10px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.25);box-shadow:0 1px 3px rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;pointer-events:none}
+.works.selecting .wcard:not(.here) .wtick{display:flex}
+.wcard.picked .wtick{background:var(--warn);border-color:var(--warn)}
+.wcard.picked .wopen{border-color:var(--warn)}
+.selbar{position:sticky;bottom:0;display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:0 -4px 14px rgba(60,45,25,.12)}
+.selbar{flex-wrap:wrap}
+.selbar span{flex:1 1 140px;font-size:12.5px}
+.resume .selbar .btn{width:auto;flex:none}   /* not the full-width buttons of the start screen */
+.btn.danger{background:var(--warn);color:var(--panel);border-color:var(--warn)}
+.btn.danger:disabled{opacity:.4}
+.btn.danger-o{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
+#workSheet{position:fixed;inset:0;z-index:52;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+#workSheet .sheet{width:min(360px,100%);max-height:100%;overflow-y:auto;box-sizing:border-box;background:var(--panel);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:6px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+#wsImg{width:100%;max-height:34vh;object-fit:contain;border-radius:10px;background:#f4f1ea}
+#wsName{font-size:16px;margin-top:4px;word-break:break-all}
+#wsMeta{color:var(--muted);font-size:12px}
+.wsacts{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.wsacts .btn{width:100%}
+.wsacts .more{align-self:center}
+.wswarn{margin:0;font-size:13.5px;line-height:1.6;color:var(--ink)}
+.wswarn b{color:var(--warn)}
+#savedStatus .savedok{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:700;color:var(--accent)}
+#savedStatus .savedok svg{width:20px;height:20px;flex:none}
+#savedStatus .savedsub{display:block;margin-top:2px}
 .resume h2{margin:4px 0 8px}
 #worksInfo{margin-top:-4px}
 .works{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
@@ -204,10 +234,6 @@ button,input,select{font:inherit;color:inherit}
 .wcard img{width:100%;aspect-ratio:4/3;object-fit:contain;border-radius:8px;background:#f4f1ea}
 .wcard .wname{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wcard small{font-size:11px;color:var(--muted);text-align:left}
-.wcard .wdel{position:absolute;top:10px;right:10px;width:30px;height:30px;border:0;border-radius:8px;background:color-mix(in srgb,var(--panel) 88%,transparent);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
-.wcard .wdel svg{width:16px;height:16px}
-.wcard .wdel:hover{color:var(--warn)}
-.wcard .wdel.confirm{width:auto;padding:0 10px;background:var(--warn);color:var(--panel);font-weight:700;font-size:12px}
 .install{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--active)}
 .install p{margin:0;flex:1 1 220px;display:flex;flex-direction:column;gap:2px}
 .install p .hint{margin:0}
@@ -366,7 +392,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
   #colorChip .ctext{display:none}
   #colorChip .dot{width:32px;height:32px}
   .swgrid{gap:8px}
-  .brand{display:none}
+  .brand{margin-right:2px}   /* phones: the mark alone, still the way to the works */
   #top .meter{min-width:70px;height:40px;padding:0 10px 0 8px;gap:4px}
   #top .meter .mtext small{font-size:11.5px}
   #top .meter .long{display:none}
@@ -495,7 +521,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 <body>
 <div id="app">
   <header id="top">
-    <div class="brand"><span class="mark" aria-hidden="true"></span><span class="name">にじみ帖</span></div>
+    <button class="brand" id="brandBtn" title="作品一覧" aria-label="作品一覧を開く"><span class="mark" aria-hidden="true"></span><span class="name">にじみ帖</span></button>
     <button class="btn icon" id="undoBtn" title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
     <button class="btn icon" id="redoBtn" title="やり直す (Ctrl+Shift+Z)" aria-label="やり直す" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
     <button class="btn meter" id="dryBtn" title="紙は乾いています" aria-label="乾かす（紙は乾いています）">
@@ -681,8 +707,9 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <small id="resumeTime"></small>
       <button class="btn primary big" id="resumeGo">続きから描く</button>
       <div id="workMore" hidden>
-        <h2>ほかの作品</h2>
+        <div class="workhead"><h2>作品一覧</h2><button class="more" id="selMode">選んで削除</button></div>
         <ul class="works" id="workGrid"></ul>
+        <div class="selbar" id="selBar" hidden><span id="selCount"></span><button class="btn" id="selCancel">やめる</button><button class="btn danger" id="selDel" disabled>削除する</button></div>
       </div>
       <small id="worksInfo"></small>
       <button class="btn big" id="toPick">新しい紙に描く</button>
@@ -740,6 +767,25 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <button class="btn" id="njSave">.nijimi で保存</button>
     </div>
     <div class="acts"><a class="btn primary" id="dlLink" download="nijimi.png" href="#">PNGをダウンロード</a><button class="btn" id="closeModal">閉じる</button></div>
+  </div>
+</div>
+<div id="workSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="wsName">
+    <img id="wsImg" alt="">
+    <b id="wsName"></b>
+    <small id="wsMeta"></small>
+    <div class="wsacts" id="wsMain">
+      <button class="btn primary big" id="wsOpen">開く</button>
+      <button class="btn big" id="wsDup">複製する</button>
+      <button class="btn big danger-o" id="wsDel">削除する</button>
+      <p class="hint" id="wsNote" hidden>描いている作品は削除できません。ほかの作品を開くか新しい紙にしてから削除してください。</p>
+      <button class="more" id="wsClose">閉じる</button>
+    </div>
+    <div class="wsacts" id="wsConfirm" hidden>
+      <p class="wswarn" id="wsWarn"></p>
+      <button class="btn big danger" id="wsDelYes">削除する</button>
+      <button class="btn big" id="wsDelNo">やめる</button>
+    </div>
   </div>
 </div>
 <div id="imgDlg" hidden>
@@ -3380,45 +3426,105 @@ async function checkSaved(){
 }
 const workTitle = w => w.name || '無題';
 function workWhen(w){ const d = new Date(w.savedAt), pad = n => String(n).padStart(2, '0'); return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17 19 7"/></svg>';
+const isHere = w => w.id === curWork && docReady;   // the work on the paper right now
+let selecting = false, picked = new Set();
 function renderWorks(){
-  const top = works[0], here = top && top.id === curWork && docReady;
+  const top = works[0], here = top && isHere(top);
   $('#backResume').textContent = `← 作品一覧（${works.length}）`;
-  $('#resume').classList.toggle('empty', !top); $('#resume').classList.toggle('many', works.length > 1);
+  $('#resume').classList.toggle('empty', !top); $('#resume').classList.toggle('many', works.length > 1); $('#resume').classList.toggle('mid', !st.first);
   if (top) {
     $('#resumeImg').src = top.thumb || '';
     $('#resumeName').textContent = workTitle(top);
     $('#resumeTime').textContent = `${workWhen(top)} に保存 · ${PAPER_INFO[top.paper] ? PAPER_INFO[top.paper].name : ''} · ${fmtSize(top.bytes || 0)}`;
     $('#resumeGo').textContent = here ? 'この作品に戻る' : '続きから描く';
   }
-  $('#resumeLead').textContent = st.first ? 'おかえりなさい。前回の絵が残っています。' : '作品一覧';
+  $('#resumeLead').textContent = st.first && top ? 'おかえりなさい。前回の絵が残っています。' : '作品一覧';
   const total = works.reduce((a, w) => a + (w.bytes || 0), 0);
-  $('#worksInfo').textContent = works.length ? `この端末に ${works.length} 枚（約 ${fmtSize(total)}）` : '';
-  const ul = $('#workGrid'); ul.innerHTML = '';
-  $('#workMore').hidden = works.length < 2;
-  works.slice(1).forEach(w => {
-    const li = document.createElement('li'); li.className = 'wcard' + (w.id === curWork && docReady ? ' here' : '');
-    li.innerHTML = `<button class="wopen"><img alt=""><span class="wname"></span><small></small></button><button class="wdel" title="この作品を消す" aria-label="この作品を消す">${TRASH}</button>`;
+  $('#worksInfo').textContent = works.length ? `この端末に ${works.length} 枚（約 ${fmtSize(total)}）` : 'まだ作品はありません。描いた絵は、ここに自動で保存されます。';
+  $('#workMore').hidden = !works.length;
+  if (!works.length) selecting = false;
+  const ul = $('#workGrid'); ul.innerHTML = ''; ul.classList.toggle('selecting', selecting);
+  works.forEach(w => {
+    const li = document.createElement('li'); li.className = 'wcard' + (isHere(w) ? ' here' : '') + (picked.has(w.id) ? ' picked' : '');
+    li.innerHTML = `<button class="wopen"><img alt=""><span class="wname"></span><small></small></button><i class="wtick">${picked.has(w.id) ? '✓' : ''}</i>`;
     li.querySelector('img').src = w.thumb || '';
     li.querySelector('.wname').textContent = workTitle(w);
-    li.querySelector('small').textContent = (w.id === curWork && docReady ? '描いている作品 · ' : '') + `${workWhen(w)} · ${fmtSize(w.bytes || 0)}`;
-    li.querySelector('.wopen').addEventListener('click', () => openWork(w.id));
-    const del = li.querySelector('.wdel');
-    del.hidden = w.id === curWork && docReady;   // the picture on the paper is not deleted from under it
-    del.addEventListener('click', () => { if (del === armedWork) deleteWork(w.id); else armWorkDelete(del); });
+    li.querySelector('small').textContent = (isHere(w) ? '描いている作品 · ' : '') + `${workWhen(w)} · ${fmtSize(w.bytes || 0)}`;
+    li.querySelector('.wopen').addEventListener('click', () => {
+      if (!selecting) { openWorkSheet(w.id); return; }
+      if (isHere(w)) { toast('描いている作品は削除できません'); return; }
+      picked.has(w.id) ? picked.delete(w.id) : picked.add(w.id); renderWorks();
+    });
     ul.appendChild(li);
   });
+  $('#selMode').hidden = selecting || !works.some(w => !isHere(w));
+  $('#selBar').hidden = !selecting;
+  $('#selCount').textContent = picked.size ? `${picked.size} 件を選んでいます` : '削除する作品を押して選んでください';
+  $('#selDel').disabled = !picked.size;
 }
-// the same two-step bin as the layers: armed until a press anywhere else
-let armedWork = null;
-function armWorkDelete(b){ disarmWorkDelete(); armedWork = b; b.classList.add('confirm'); b.textContent = '消す'; }
-function disarmWorkDelete(){ if (armedWork) { armedWork.classList.remove('confirm'); armedWork.innerHTML = TRASH; armedWork = null; } }
-document.addEventListener('pointerdown', e => { if (armedWork && !armedWork.contains(e.target)) disarmWorkDelete(); }, true);
-async function deleteWork(id){
-  const w = works.find(x => x.id === id); armedWork = null;
-  try { await vault.delMany(['work:' + id, 'info:' + id]); } catch (e) { toast('消せませんでした'); return; }
-  works = works.filter(x => x.id !== id); renderWorks();
-  toast(`「${w ? workTitle(w) : '作品'}」を消しました`);
+function setSelecting(on){ selecting = on; picked.clear(); renderWorks(); }
+$('#selMode').addEventListener('click', () => setSelecting(true));
+$('#selCancel').addEventListener('click', () => setSelecting(false));
+$('#selDel').addEventListener('click', () => { if (picked.size) askDelete([...picked]); });
+// one work: open it, copy it, or delete it (after a second, red confirmation)
+let sheetWork = null;
+function openWorkSheet(id){
+  const w = works.find(x => x.id === id); if (!w) return;
+  sheetWork = id;
+  $('#wsImg').hidden = false; $('#wsImg').src = w.thumb || '';
+  $('#wsName').hidden = false; $('#wsName').textContent = workTitle(w);
+  $('#wsMeta').hidden = false; $('#wsMeta').textContent = `${isHere(w) ? '描いている作品 · ' : ''}${workWhen(w)} に保存 · ${PAPER_INFO[w.paper] ? PAPER_INFO[w.paper].name : ''} · ${fmtSize(w.bytes || 0)}`;
+  $('#wsOpen').textContent = isHere(w) ? 'この作品に戻る' : '開く';
+  $('#wsDel').hidden = isHere(w); $('#wsNote').hidden = !isHere(w);
+  $('#wsMain').hidden = false; $('#wsConfirm').hidden = true;
+  $('#workSheet').hidden = false;
+  setTimeout(() => $('#wsOpen').focus({ preventScroll:true }), 30);
 }
+let deleting = [];
+function askDelete(ids){
+  deleting = ids;
+  const one = ids.length === 1 ? works.find(x => x.id === ids[0]) : null;
+  if (!sheetWork || $('#workSheet').hidden) {   // from the multi-select bar: the confirmation alone
+    $('#wsImg').hidden = !one; if (one) $('#wsImg').src = one.thumb || '';
+    $('#wsName').hidden = $('#wsMeta').hidden = true;
+  }
+  $('#wsWarn').innerHTML = '';
+  $('#wsWarn').append(one ? `「${workTitle(one)}」を` : `${ids.length} 件の作品を`, Object.assign(document.createElement('b'), { textContent: '削除します' }),
+    '。この端末から消え、元に戻せません。残したい作品は、先に開いて .nijimi で保存してください。');
+  $('#wsDelYes').textContent = ids.length === 1 ? '削除する' : `${ids.length} 件を削除する`;
+  $('#wsMain').hidden = true; $('#wsConfirm').hidden = false; $('#workSheet').hidden = false;
+  setTimeout(() => $('#wsDelNo').focus({ preventScroll:true }), 30);   // the safe answer is the one under the finger
+}
+function closeWorkSheet(){ $('#workSheet').hidden = true; sheetWork = null; deleting = []; }
+$('#wsClose').addEventListener('click', closeWorkSheet);
+$('#workSheet').addEventListener('click', e => { if (e.target.id === 'workSheet') closeWorkSheet(); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#workSheet').hidden) { closeWorkSheet(); e.stopImmediatePropagation(); } }, true);
+$('#wsOpen').addEventListener('click', () => { const id = sheetWork; closeWorkSheet(); if (id) openWork(id); });
+$('#wsDup').addEventListener('click', () => { const id = sheetWork; closeWorkSheet(); if (id) duplicateWork(id); });
+$('#wsDel').addEventListener('click', () => { if (sheetWork) askDelete([sheetWork]); });
+$('#wsDelNo').addEventListener('click', () => { if (sheetWork && deleting.length === 1) openWorkSheet(sheetWork); else closeWorkSheet(); });
+$('#wsDelYes').addEventListener('click', () => { const ids = deleting; closeWorkSheet(); deleteWorks(ids); });
+async function deleteWorks(ids){
+  ids = ids.filter(id => !works.some(w => w.id === id && isHere(w)));   // never the one on the paper
+  if (!ids.length) return;
+  const one = ids.length === 1 ? works.find(x => x.id === ids[0]) : null;
+  try { await vault.delMany(ids.flatMap(id => ['work:' + id, 'info:' + id])); } catch (e) { toast('削除できませんでした'); return; }
+  works = works.filter(x => !ids.includes(x.id)); selecting = false; picked.clear(); renderWorks();
+  toast(one ? `「${workTitle(one)}」を削除しました` : `${ids.length} 件の作品を削除しました`);
+}
+async function duplicateWork(id){
+  if (id === curWork) await flushSave();   // copy what is on the paper now, not the last save
+  const rec = await vault.get('work:' + id), w = works.find(x => x.id === id);
+  if (!rec || !w) { toast('この作品が見つかりませんでした'); return; }
+  const nid = newWorkId(), name = `${workTitle(w)}のコピー`.slice(0, 60), now = Date.now();
+  const card = { ...w, id: nid, name, savedAt: now };
+  try { await vault.setMany({ ['work:' + nid]: { ...rec, meta: { ...rec.meta, name, savedAt: now } }, ['info:' + nid]: card }); }
+  catch (e) { toast(e && e.name === 'QuotaExceededError' ? '端末の空き容量が足りず、複製できませんでした' : '複製できませんでした'); return; }
+  works.unshift(card); renderWorks();
+  toast(`「${name}」を作りました`);
+}
+$('#brandBtn').addEventListener('click', () => { if (stroke) return; if (xf) xfEnd(true); openStart(false); showResumeView(true); });
 let opening = false;
 async function openWork(id){
   if (opening) return;
@@ -3649,7 +3755,10 @@ async function showSaved(){
   st0.textContent = '保存しています…';
   await flushSave();
   const me = works.find(w => w.id === curWork);
-  if (me) { st0.innerHTML = ''; st0.append('「', Object.assign(document.createElement('b'), { textContent: workTitle(me) }), `」は ${workWhen(me)} に保存済みです（${fmtSize(me.bytes || 0)}）。描くたびに自動で保存されます。`); }
+  if (me) {
+    st0.innerHTML = `<span class="savedok">${CHECK}この作品は保存済みです</span><span class="savedsub"></span>`;
+    st0.querySelector('.savedsub').textContent = `「${workTitle(me)}」· ${workWhen(me)} に保存 · ${fmtSize(me.bytes || 0)}。描くたびに自動で保存されます。`;
+  }
   else st0.textContent = docReady ? 'まだ何も描いていないので、作品一覧には入っていません。描くと自動で保存されます。' : '';
   const ul = $('#savedStrip'); ul.innerHTML = '';
   works.slice(0, 12).forEach(w => {
@@ -3657,7 +3766,7 @@ async function showSaved(){
     li.innerHTML = '<button><img alt=""><span></span></button>';
     li.querySelector('img').src = w.thumb || ''; li.querySelector('span').textContent = w.id === curWork ? 'いま描いている作品' : workTitle(w);
     li.querySelector('button').title = `${workTitle(w)}（${workWhen(w)}）`;
-    li.querySelector('button').addEventListener('click', () => { $('#modal').hidden = true; if (w.id !== curWork) openWork(w.id); });
+    li.querySelector('button').addEventListener('click', () => { $('#modal').hidden = true; openStart(false); showResumeView(true); openWorkSheet(w.id); });
     ul.appendChild(li);
   });
   const total = works.reduce((a, w) => a + (w.bytes || 0), 0);
