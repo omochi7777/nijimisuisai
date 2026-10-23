@@ -228,6 +228,20 @@ button,input,select{font:inherit;color:inherit}
 #lossDlg{position:fixed;inset:0;z-index:53;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
 #lossDlg .sheet{width:min(380px,100%);max-height:100%;overflow-y:auto;box-sizing:border-box;background:var(--panel);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
 .losstitle{font-size:16px;color:var(--caution)}
+#sizeDlg{position:fixed;inset:0;z-index:53;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
+#sizeDlg .sheet{width:min(420px,100%);max-height:100%;overflow-y:auto;box-sizing:border-box;background:var(--panel);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+#sizeDlg .hint{margin:0}
+#sizeDlg .acts{display:flex;gap:8px;justify-content:flex-end}
+.szrow{display:flex;align-items:flex-end;gap:8px}
+.szrow label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);flex:1}
+.szrow input{height:34px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:0 8px;font-size:14px;font-family:var(--font-mono);-webkit-user-select:text;user-select:text;width:100%;box-sizing:border-box}
+.szrow span{padding-bottom:8px}
+.anchor{display:grid;grid-template-columns:repeat(3,30px);gap:4px}
+.anchor button{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer;padding:0}
+.anchor button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent)}
+.szinfo{margin:0;font-size:13px;line-height:1.55}
+.szinfo .bad{color:var(--caution);font-weight:700}
+#sizeBtn{justify-content:space-between}
 #savedStatus .savedok svg{width:20px;height:20px;flex:none}
 #savedStatus .savedsub{display:block;margin-top:2px}
 .resume h2{margin:4px 0 8px}
@@ -666,6 +680,8 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <div class="ph"><span class="ptitle">紙の質感<small class="hint" style="font-family:var(--font-ui);margin-left:6px">描いたまま変更できます</small></span><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="seg" id="paperSeg"></div>
       <button class="nlink" data-note="paper" style="margin-top:-4px">紙のちがいを見る</button>
+      <button class="btn" id="sizeBtn">紙の大きさを変える <span class="mono" id="sizeNow"></span></button>
+      <label class="check"><input type="checkbox" id="flatPaper"><span>紙目を表示しない（見た目だけ。にじみ方は変わりません）</span></label>
       <div class="row"><label for="bleed">にじみ</label><input id="bleed" type="range" min="20" max="250" step="1" value="100"><output id="bleedV"></output></div>
       <div class="row"><label for="drySpd">乾く速さ</label><input id="drySpd" type="range" min="10" max="400" step="1" value="100"><output id="drySpdV"></output></div>
       <div class="row"><label for="vein">にじみの筋</label><input id="vein" type="range" min="0" max="200" step="1" value="140"><output id="veinV"></output></div>
@@ -740,6 +756,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <div class="stacts">
       <p class="hint" id="startWarn" hidden>新しい紙にすると、今の絵は消えます（必要なら先に「保存」してください）。</p>
       <button class="more" data-open title="にじみ帖のファイル（.nijimi）で続きから描く、または画像を読み込む">ファイルを開く（.nijimi・画像）</button>
+      <button class="more" id="startSize" hidden>いまの紙の大きさを変える</button>
       <button class="btn" id="startKeep" hidden>紙の質感だけ変える</button>
       <button class="btn primary big" id="startGo">この紙で描きはじめる</button>
     </div>
@@ -773,6 +790,26 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <button class="btn" id="njSave">.nijimi で保存</button>
     </div>
     <div class="acts"><a class="btn primary" id="dlLink" download="nijimi.png" href="#">PNGをダウンロード</a><button class="btn" id="closeModal">閉じる</button></div>
+  </div>
+</div>
+<div id="sizeDlg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="szTitle">
+    <div class="ph"><span class="ptitle" id="szTitle">紙の大きさを変える</span><span class="hint mono" id="szNow"></span></div>
+    <div class="seg" id="szMode"><button data-m="scale">絵ごと拡大・縮小</button><button data-m="canvas">紙を足す・切る</button></div>
+    <p class="hint" id="szModeHint"></p>
+    <div class="szrow">
+      <label>幅<input type="number" id="szW" min="300" max="2400" step="10" inputmode="numeric"></label>
+      <span>×</span>
+      <label>高さ<input type="number" id="szH" min="300" max="2400" step="10" inputmode="numeric"></label>
+      <span class="hint">px</span>
+    </div>
+    <label class="check" id="szLockRow"><input type="checkbox" id="szLock" checked><span>縦横の比率を保つ</span></label>
+    <div class="sizes" id="szChips"></div>
+    <div id="szAnchorRow"><p class="hint" style="margin:0 0 4px">いまの絵を置く位置</p><div class="anchor" id="szAnchor"></div></div>
+    <p class="szinfo" id="szInfo" role="status"></p>
+    <label class="check"><input type="checkbox" id="szKeep" checked><span>変更前の絵を作品一覧に残す（複製）</span></label>
+    <p class="hint">大きさを変えると、元に戻すの履歴は消えます。濡れている絵の具は、乾かして定着させてから変えます。</p>
+    <div class="acts"><button class="btn" id="szCancel">やめる</button><button class="btn primary" id="szGo">変更する</button></div>
   </div>
 </div>
 <div id="lossDlg" hidden>
@@ -882,6 +919,7 @@ uniform vec2 u_doc; uniform sampler2D u_paper; uniform float u_plod;
 /* paper height map: r = height, g = fibre, b = random */
 const FS_PAPER = HEAD + NOISE + `
 uniform float u_seed, u_scale, u_bump, u_large, u_fine, u_fiber;
+uniform vec2 u_off;   // where the sheet's first corner sits in the pattern: paper added on the left or top moves it
 out vec4 o;
 float fiberLayer(vec2 p, float ang, float s){
   vec2 d = vec2(cos(ang), sin(ang)); vec2 q = vec2(dot(p,d), dot(p, vec2(-d.y,d.x)));
@@ -889,7 +927,7 @@ float fiberLayer(vec2 p, float ang, float s){
   return pow(1. - abs(n*2.-1.), 7.);
 }
 void main(){
-  vec2 p = gl_FragCoord.xy + u_seed * 131.7;
+  vec2 p = gl_FragCoord.xy - u_off + u_seed * 131.7;
   float w1 = worley(p / u_scale);
   float w2 = worley(p / (u_scale*.55) + 5.3);
   float bumps = (1. - smoothstep(.05, .9, w1)) * .65 + (1. - smoothstep(.05, .9, w2)) * .35;
@@ -1051,6 +1089,14 @@ const FS_WETMAP = HEAD + `
 uniform sampler2D u_W; uniform vec2 u_size;
 out vec4 o;
 void main(){ vec4 w = texture(u_W, gl_FragCoord.xy / u_size); o = vec4(clamp(w.r * 10., 0., 1.), clamp(w.g, 0., 1.), 0., 1.); }`;
+const FS_RESAMPLE = HEAD + `
+uniform sampler2D u_src; uniform vec2 u_srcSize, u_off, u_scale; uniform float u_lod;   // a new-sheet point p shows the old one at (p - off) / scale
+out vec4 o;
+void main(){
+  vec2 q = (gl_FragCoord.xy - u_off) / u_scale;
+  vec4 c = textureLod(u_src, q / u_srcSize, u_lod);
+  o = (q.x < 0. || q.y < 0. || q.x > u_srcSize.x || q.y > u_srcSize.y) ? vec4(0) : c;
+}`;
 const FS_XFORM = HEAD + `
 uniform sampler2D u_src; uniform vec2 u_doc; uniform vec3 u_xf;   // u_xf: x, y, scale. A paper point p shows the original at (p - xy) / scale
 uniform float u_lod;   // which mipmap to read when shrinking; given outright, since the edge of the picture would upset an automatic choice
@@ -1337,7 +1383,7 @@ try {
     paper: program(VS_FULL, FS_PAPER), flux: program(VS_FULL, FS_FLUX), update: program(VS_FULL, FS_UPDATE),
     finalize: program(VS_FULL, FS_FINALIZE), bake: program(VS_FULL, FS_BAKE), comp: program(VS_FULL, FS_COMP),
     brush: program(VS_DAB, FS_BRUSH), simErase: program(VS_DAB, FS_SIMERASE), layerErase: program(VS_DAB, FS_LAYERERASE),
-    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM),
+    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM), resample: program(VS_FULL, FS_RESAMPLE),
   };
 } catch (err) { fatal('シェーダーの準備に失敗しました: ' + err.message); console.error(err); return; }
 
@@ -1508,7 +1554,7 @@ const store = {
   set(k, v){ try { localStorage.setItem('nijimi:' + k, JSON.stringify(v)); } catch (e) {} },
 };
 const S = Object.assign({
-  tool:'brush', paper:'cold', colorSet:'classic', vein:140, bleed:100, drySpd:100, gran:100, curve:100, stab:2, penOnly:false, runout:true,
+  flatPaper:false, tool:'brush', paper:'cold', colorSet:'classic', vein:140, bleed:100, drySpd:100, gran:100, curve:100, stab:2, penOnly:false, runout:true,
   grade:'HB', pigment:6, custom:null,
   recent:[], favs:[], showFav:false, mkMode:'wheel',   // recently used colours, favourite colours, how to make a new colour
   tools:{},
@@ -1531,7 +1577,7 @@ function currentColor(){
 }
 
 let doc = { w:1600, h:1200 }, sim = { w:1600, h:1200 }, simQ = 1;
-let paperTex, paperFbo, paperSeed = Math.random() * 100;
+let paperTex, paperFbo, paperSeed = Math.random() * 100, paperOff = [0, 0];
 let layers = [], active = null, layerSeq = 1, docName = '', curWork = null, blankDoc = true;   // blankDoc: a fresh sheet nothing has been done to yet   // docName: the picture's name; curWork: its id in the device's works (none until first saved)
 const W = [], P = [], D = [], F = [], simFbo = [], fW = [], fP = [], fD = [], fF = [];
 let si = 0, fi = 0;
@@ -1569,11 +1615,11 @@ function freeDoc(){
   clearUndo();
   layers = [];
 }
-function createDoc(w, h, q, seed){
+function createDoc(w, h, q, seed, off){
   freeDoc();
   doc = { w, h }; simQ = q; docName = ''; curWork = null; blankDoc = true; nameDirty = false; sim = { w:Math.round(w * q), h:Math.round(h * q) };
   paperTex = mkTex(w, h, 'u8mip'); paperFbo = mkFbo([paperTex]);
-  paperSeed = seed != null ? seed : Math.random() * 100; genPaper();
+  paperSeed = seed != null ? seed : Math.random() * 100; paperOff = off || [0, 0]; genPaper();
   for (let i = 0; i < 2; i++) {
     W[i] = mkTex(sim.w, sim.h); P[i] = mkTex(sim.w, sim.h); D[i] = mkTex(sim.w, sim.h); F[i] = mkTex(sim.w, sim.h);
     simFbo[i] = mkFbo([W[i], P[i], D[i]]); fW[i] = mkFbo([W[i]]); fP[i] = mkFbo([P[i]]); fD[i] = mkFbo([D[i]]); fF[i] = mkFbo([F[i]]);
@@ -1585,11 +1631,12 @@ function createDoc(w, h, q, seed){
   addLayer('水彩'); addLayer('線画');
   active = layers[0];
   renderLayers(); view.r = 0; updateRotUI(); fitView(); updateUndoUI(); dirty = true;
+  syncSizeBtn();
 }
 function genPaper(){
   const pp = PAPERS[S.paper];
   gl.disable(gl.BLEND); target(paperFbo);
-  use(progs.paper, { u_seed:paperSeed, u_scale:pp.scale, u_bump:pp.bump, u_large:pp.large, u_fine:pp.fine, u_fiber:pp.fiber });
+  use(progs.paper, { u_seed:paperSeed, u_scale:pp.scale, u_bump:pp.bump, u_large:pp.large, u_fine:pp.fine, u_fiber:pp.fiber, u_off:paperOff });
   drawFull();
   gl.bindTexture(gl.TEXTURE_2D, paperTex); gl.generateMipmap(gl.TEXTURE_2D);
   dirty = true;
@@ -2169,12 +2216,14 @@ function readStageBg(){
   dirty = true;
 }
 
+// the paper's relief as drawn on screen and in exports; "flat paper" hides it (the water still follows the real one)
+function paperShade(){ return S.flatPaper ? 0 : PAPERS[S.paper].shade; }
 // how strongly a layer shows; its wet paint, gloss and damp paper all follow the same number
 function layerOp(L){ return L && L.visible ? L.opacity : 0; }
 function composite(){
   gl.disable(gl.BLEND); target(null);
   const pp = PAPERS[S.paper];
-  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:paperShade(), u_paperCol:pp.col, u_bg:stageBg,
     u_doc:[doc.w, doc.h], u_canvas:[canvas.width, canvas.height], u_view:[view.x * DPR, view.y * DPR, view.z * DPR], u_rot:[Math.cos(view.r), Math.sin(view.r)], u_export:0 };
   const op = new Float32Array(8);
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
@@ -3207,7 +3256,7 @@ $('#saveBtn').addEventListener('click', () => {
   const t = mkTex(doc.w, doc.h, 'u8'), f = mkFbo([t]);
   gl.disable(gl.BLEND); target(f);
   const pp = PAPERS[S.paper];
-  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:paperShade(), u_paperCol:pp.col, u_bg:stageBg,
     u_doc:[doc.w, doc.h], u_canvas:[doc.w, doc.h], u_view:[0, 0, 1], u_rot:[1, 0], u_export:1 };
   const op = new Float32Array(8);
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
@@ -3311,7 +3360,7 @@ function thumbnail(){
   const t = mkTex(tw, th, 'u8'), f = mkFbo([t]);
   gl.disable(gl.BLEND); target(f);
   const pp = PAPERS[S.paper];
-  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:pp.shade, u_paperCol:pp.col, u_bg:stageBg,
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:paperShade(), u_paperCol:pp.col, u_bg:stageBg,
     u_doc:[doc.w, doc.h], u_canvas:[tw, th], u_view:[0, 0, sc], u_rot:[1, 0], u_export:1, u_gouache:GOUACHE_WHITE,
     u_wetIdx: simOwner ? layers.indexOf(simOwner) : -1, u_wetOp: simOwner ? layerOp(simOwner) : 1 };
   const op = new Float32Array(8);
@@ -3334,7 +3383,7 @@ function captureDrawing(){
     simRaw = readHalf(f, sim.w, sim.h); freeTF(t, f);
   }
   const meta = { v:1, w:doc.w, h:doc.h, q:simQ, paper:S.paper, seed:paperSeed, active: layers.indexOf(active), owner: simRaw ? layers.indexOf(simOwner) : -1,
-    layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), name: docName, savedAt: Date.now() };
+    layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), name: docName, poff: paperOff, savedAt: Date.now() };
   return { raw, simRaw, meta, thumb: thumbnail() };
 }
 let saveTimer = 0, saving = false, saveGen = 0, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
@@ -3441,7 +3490,7 @@ async function restoreDrawing(rec){
 }
 function applyDrawing({ m, px, simPx }){
   S.paper = PAPERS[m.paper] ? m.paper : 'cold'; saveSettings();
-  createDoc(m.w, m.h, m.q, m.seed); docName = typeof m.name === 'string' ? m.name : ''; blankDoc = false;
+  createDoc(m.w, m.h, m.q, m.seed, Array.isArray(m.poff) && m.poff.every(Number.isFinite) ? m.poff : null); docName = typeof m.name === 'string' ? m.name : ''; blankDoc = false;
   while (layers.length < m.layers.length) addLayer();
   while (layers.length > m.layers.length) { const L = layers.pop(); freeTF(L.tex, L.fbo); }
   for (let i = 0; i < layers.length; i++) {
@@ -3570,13 +3619,13 @@ async function deleteWorks(ids){
   works = works.filter(x => !ids.includes(x.id)); selecting = false; picked.clear(); renderWorks();
   toast(one ? `「${workTitle(one)}」を削除しました` : `${ids.length} 件の作品を削除しました`);
 }
-async function duplicateWork(id){
+async function duplicateWork(id, label){
   // copy what is on the paper now, not the last save; if that cannot be stored, the copy is of the stored state and says so
   if (id === curWork) await flushSave();
   const stale = id === curWork && hasUnsaved();
   const rec = await vault.get('work:' + id), w = works.find(x => x.id === id);
   if (!rec || !w) { toast('この作品が見つかりませんでした'); return; }
-  const nid = newWorkId(), name = `${workTitle(w)}のコピー`.slice(0, 60), now = Date.now();
+  const nid = newWorkId(), name = `${workTitle(w)}${label || 'のコピー'}`.slice(0, 60), now = Date.now();
   const card = { ...w, id: nid, name, savedAt: now };
   try { await vault.setMany({ ['work:' + nid]: { ...rec, meta: { ...rec.meta, name, savedAt: now } }, ['info:' + nid]: card }); }
   catch (e) { toast(e && e.name === 'QuotaExceededError' ? '端末の空き容量が足りず、複製できませんでした' : '複製できませんでした'); return; }
@@ -3648,7 +3697,7 @@ async function readNijimi(file){
   if (at > buf.byteLength) throw new Error('file is cut short');
   const part = b => ({ raw: h.enc === 'split16', split:true, buf:b });
   const n = h.layers.length, owner = Number.isInteger(h.owner) && h.owner >= 0 && h.owner < n && bufs.length > n ? h.owner : -1;
-  const meta = { name: cleanName(String(h.name || '')), w:h.w, h:h.h, q:h.q, paper:h.paper, seed: +h.seed || 0, active: Number.isInteger(h.active) ? h.active : 0, owner,
+  const meta = { name: cleanName(String(h.name || '')), poff: Array.isArray(h.poff) && h.poff.length === 2 && h.poff.every(Number.isFinite) ? h.poff : null, w:h.w, h:h.h, q:h.q, paper:h.paper, seed: +h.seed || 0, active: Number.isInteger(h.active) ? h.active : 0, owner,
     layers: h.layers.map((L, i) => ({ name: String(L && L.name || 'レイヤー ' + (i + 1)).slice(0, 40), visible: !(L && L.visible === false), opacity: L && Number.isFinite(+L.opacity) ? clamp(+L.opacity, 0, 1) : 1 })) };
   return { meta, data: bufs.slice(0, n).map(part), simData: owner >= 0 ? part(bufs[n]) : null };
 }
@@ -3844,6 +3893,103 @@ async function showSaved(){
 }
 $('#toWorks').addEventListener('click', () => { $('#modal').hidden = true; openStart(false); showResumeView(true); });
 
+/* ================= the size of the sheet, after the fact ================= */
+// Same limits as the largest sheet on the start screen: past that, phones run out of graphics memory.
+const PAPER_MIN = 300, PAPER_MAX = 2400, PAPER_AREA = 2400 * 1800;
+const paperSizeOK = (w, h) => w >= PAPER_MIN && h >= PAPER_MIN && w <= PAPER_MAX && h <= PAPER_MAX && w * h <= PAPER_AREA;
+// 'scale': the picture grows or shrinks with the sheet. 'canvas': the picture stays as it is; paper is added or cut away,
+// and (ax, ay) say where the picture sits (0 = left / top, .5 = middle, 1 = right / bottom)
+async function resizePaper(nw, nh, mode, ax, ay, keepCopy){
+  if (stroke || !paperSizeOK(nw, nh)) return false;
+  if (xf) xfEnd(true);
+  if (keepCopy && curWork) {
+    await flushSave();
+    if (hasUnsaved()) { toast('いまの絵を保存できていないため、変更前の複製は作れませんでした'); return false; }
+    await duplicateWork(curWork, '（大きさ変更前）');
+  }
+  if (simOwner && simHasContent) bakeSim(false);   // the wet paint settles into its layer, which then moves with the rest
+  const ow = doc.w, oh = doc.h, scale = mode === 'scale';
+  const sx = scale ? nw / ow : 1, sy = scale ? nh / oh : 1;
+  const ox = scale ? 0 : Math.round((nw - ow) * ax), oy = scale ? 0 : Math.round((nh - oh) * ay);
+  const lod = Math.max(0, Math.log2(1 / Math.min(sx, sy)));
+  const made = layers.map(L => {
+    if (lod > 0) { gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.generateMipmap(gl.TEXTURE_2D); }
+    const t = mkTex(nw, nh), f = mkFbo([t]);
+    gl.disable(gl.BLEND); target(f);
+    use(progs.resample, { u_src:L.tex, u_srcSize:[ow, oh], u_off:[ox, oy], u_scale:[sx, sy], u_lod:lod }); drawFull();
+    return { L, t, f };
+  });
+  // a fresh document of the new size, then the same layers (names, order, visibility) on their resampled sheets
+  const keep = { layers: layers.slice(), active, layerSeq, docName, curWork, nameDirty };
+  createDoc(nw, nh, simQ, paperSeed, scale ? paperOff : [paperOff[0] + ox, paperOff[1] + oy]);   // frees the old sheets and the history
+  for (const L of layers) freeTF(L.tex, L.fbo);
+  made.forEach(m => { m.L.tex = m.t; m.L.fbo = m.f; });
+  layers = keep.layers; active = keep.active; layerSeq = keep.layerSeq;
+  docName = keep.docName; curWork = keep.curWork; nameDirty = keep.nameDirty; blankDoc = false;
+  renderLayers(); fitView(); dirty = true;   // and it is saved over the same work
+  return true;
+}
+
+// the dialog: two ways, the numbers, presets, where the picture sits when paper is added or cut
+const sz = { mode:'scale', ax:.5, ay:.5 };
+function openSizeDlg(){
+  if (stroke) return;
+  sz.mode = 'scale'; sz.ax = sz.ay = .5;
+  $('#szW').value = doc.w; $('#szH').value = doc.h; $('#szLock').checked = true;
+  $('#szKeep').checked = !!curWork; $('#szKeep').closest('label').hidden = !curWork;   // nothing saved yet: nothing to keep a copy of
+  $('#szNow').textContent = `いま ${doc.w} × ${doc.h}`;
+  $('#szChips').innerHTML = '';
+  SIZES.forEach(z => { const b = document.createElement('button'); b.textContent = `${z.label} ${z.w}×${z.h}`; b.addEventListener('click', () => { $('#szW').value = z.w; $('#szH').value = z.h; syncSizeDlg(); }); $('#szChips').appendChild(b); });
+  $('#szAnchor').innerHTML = '';
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+    const b = document.createElement('button'); b.dataset.ax = c / 2; b.dataset.ay = r / 2;
+    b.title = ['上', '真ん中', '下'][r] + (c === 1 ? '' : ['の左', '', 'の右'][c]); if (r === 1 && c === 1) b.title = '真ん中';
+    b.setAttribute('aria-label', b.title);
+    b.addEventListener('click', () => { sz.ax = +b.dataset.ax; sz.ay = +b.dataset.ay; syncSizeDlg(); });
+    $('#szAnchor').appendChild(b);
+  }
+  syncSizeDlg(); $('#sizeDlg').hidden = false;
+  setTimeout(() => $('#szW').focus({ preventScroll:true }), 30);
+}
+function syncSizeDlg(){
+  const scale = sz.mode === 'scale', w = Math.round(+$('#szW').value), h = Math.round(+$('#szH').value);
+  $$('#szMode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === sz.mode)));
+  $('#szModeHint').textContent = scale ? '紙と一緒に、描いた絵も同じ割合で大きく・小さくなります。拡大すると少しぼやけます。'
+    : '描いた絵はそのままで、紙を広げたり、はみ出した部分を切り落としたりします。';
+  $('#szLockRow').hidden = !scale; $('#szAnchorRow').hidden = scale;
+  $$('#szAnchor button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.ax === sz.ax && +b.dataset.ay === sz.ay)));
+  const info = $('#szInfo'); info.innerHTML = '';
+  let ok = Number.isFinite(w) && Number.isFinite(h) && paperSizeOK(w, h), same = w === doc.w && h === doc.h;
+  if (!ok) info.append(Object.assign(document.createElement('span'), { className:'bad', textContent:`1辺は ${PAPER_MIN}〜${PAPER_MAX}px、全体で約${Math.round(PAPER_AREA / 1e4)}万画素（${PAPER_MAX}×1800 と同じ）までです。` }));
+  else if (same) info.textContent = 'いまと同じ大きさです。';
+  else {
+    const pct = scale ? (Math.abs(w / doc.w - h / doc.h) < .005 ? `（${Math.round(w / doc.w * 100)}%）` : '（縦横の比率が変わります）') : '';
+    const cut = !scale && (w < doc.w || h < doc.h) ? ' はみ出した部分は切り落とされます。' : '';
+    info.textContent = `${doc.w} × ${doc.h} → ${w} × ${h}${pct}。${cut}`;
+  }
+  $('#szGo').disabled = !ok || same;
+}
+$$('#szMode').forEach(seg => seg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sz.mode = b.dataset.m; syncSizeDlg(); }));
+// with the ratio locked, one side follows the other
+$('#szW').addEventListener('input', () => { if (sz.mode === 'scale' && $('#szLock').checked) $('#szH').value = Math.round(+$('#szW').value * doc.h / doc.w); syncSizeDlg(); });
+$('#szH').addEventListener('input', () => { if (sz.mode === 'scale' && $('#szLock').checked) $('#szW').value = Math.round(+$('#szH').value * doc.w / doc.h); syncSizeDlg(); });
+$('#szLock').addEventListener('change', syncSizeDlg);
+$('#szCancel').addEventListener('click', () => { $('#sizeDlg').hidden = true; });
+$('#sizeDlg').addEventListener('click', e => { if (e.target.id === 'sizeDlg') $('#sizeDlg').hidden = true; });
+$('#szGo').addEventListener('click', async () => {
+  const w = Math.round(+$('#szW').value), h = Math.round(+$('#szH').value);
+  $('#szGo').disabled = true;
+  const done = await resizePaper(w, h, sz.mode, sz.ax, sz.ay, $('#szKeep').checked && !$('#szKeep').closest('label').hidden);
+  $('#sizeDlg').hidden = true;
+  if (done) { syncSizeBtn(); toast(`紙を ${w} × ${h} にしました`); }
+});
+$('#sizeBtn').addEventListener('click', openSizeDlg);
+$('#startSize').addEventListener('click', () => { closeStart(); openSizeDlg(); });
+function syncSizeBtn(){ $('#sizeNow').textContent = `${doc.w}×${doc.h}`; }
+// flat paper
+$('#flatPaper').checked = !!S.flatPaper;
+$('#flatPaper').addEventListener('change', e => { S.flatPaper = e.target.checked; saveSettings(); dirty = true; toast(S.flatPaper ? '紙目を表示しないようにしました（画像の書き出しも同じです）' : '紙目を表示するようにしました'); });
+
 /* ================= installing as an app ================= */
 // Chrome / Edge / Android offer an install prompt that the page can trigger; iPhone and iPad only add from Safari's share menu,
 // so there the card explains where to tap. Shown only where it can work, and never once installed.
@@ -3951,7 +4097,7 @@ function openStart(first){
   if (!first) {
     const cur = SIZES.find(z => z.w === doc.w && z.h === doc.h); if (cur) st.size = cur.k; st.q = simQ;
   }
-  $('#startClose').hidden = first; $('#startKeep').hidden = first; $('#startWarn').hidden = first; $('#resume').hidden = true;
+  $('#startClose').hidden = first; $('#startKeep').hidden = first; $('#startSize').hidden = first; $('#startWarn').hidden = first; $('#resume').hidden = true;
   $('#startWarn').textContent = '新しい紙にしたりファイルを開いたりしても、今の絵は作品一覧に残ります。'; $('#startGo').classList.add('primary');
   $('#startGo').textContent = first ? 'この紙で描きはじめる' : '新しい紙で描きはじめる';
   ['props', 'layers', 'settings', 'tilt'].forEach(k => { if (isNarrow() || k === 'settings' || k === 'tilt') $('#' + k).hidden = true; }); setDrawer(false, true); syncPanelBtns();
