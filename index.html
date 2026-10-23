@@ -133,7 +133,7 @@ button,input,select{font:inherit;color:inherit}
 #rotBtn svg{width:16px;height:16px;transition:transform .2s}
 #tiltBtn.tilted{border-color:var(--wet);color:var(--wet)}
 .mclose{display:none}
-#props .mclose{display:inline-flex}   /* the tool panel can be closed at any width; tapping the selected tool brings it back */
+#props .mclose,#settings .mclose{display:inline-flex}   /* the tool panel can be closed at any width; tapping the selected tool brings it back */
 #scrim{position:absolute;inset:0;z-index:6;background:rgba(12,16,22,.26)}
 
 /* selected colour: a small chip on the paper, the colour drawer slides out from it */
@@ -725,9 +725,9 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     </section>
 
     <section id="settings" class="panel" aria-label="紙と設定" hidden>
-      <button class="btn primary" id="paperBtn2">新しい紙を選ぶ</button>
+      <div class="ph"><span class="ptitle">設定</span><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="row phoneonly"><label>表示</label><div class="seg" id="themeSeg" style="grid-column:2/4"><button data-t="auto">自動</button><button data-t="light">ライト</button><button data-t="dark">ダーク</button></div></div>
-      <div class="ph"><span class="ptitle">紙の質感<small class="hint" style="font-family:var(--font-ui);margin-left:6px">描いたまま変更できます</small></span><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="ph"><span class="ptitle">紙の質感<small class="hint" style="font-family:var(--font-ui);margin-left:6px">描いたまま変更できます</small></span></div>
       <div class="seg" id="paperSeg"></div>
       <div class="tints" id="tintSet" aria-label="紙の色"></div>
       <p class="hint tinthint" hidden>濃い色の紙では、透明な水彩や鉛筆・インクは見えにくくなります。ガッシュや白で描くのに向いています。</p>
@@ -4337,7 +4337,6 @@ $('#toPick').addEventListener('click', () => { showResumeView(false); setTimeout
 $('#backResume').addEventListener('click', () => showResumeView(true));
 function closeStart(){ $('#start').hidden = true; if (isNarrow()) $('#props').hidden = true; syncPanelBtns(); }
 $('#paperBtn').addEventListener('click', () => openStart(false));
-$('#paperBtn2').addEventListener('click', () => openStart(false));
 
 /* ================= technique note ================= */
 // everything here is opened only on demand: the 📖 button on the desk, the "N" key, or a small link next to a tool, the paper or the tilt pad
