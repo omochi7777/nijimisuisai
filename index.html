@@ -3517,7 +3517,7 @@ async function flushSave(){
   if (vaultOK && docReady && (hasUnsaved() || nameDirty)) await saveDrawing();   // also retries a save that failed earlier, and a new name
 }
 // nothing would be lost by leaving: all on the device, or all in the .nijimi file just written (or nothing started yet)
-const safeToLeave = () => !docReady || !hasUnsaved() || keptSeq === changeSeq;
+const safeToLeave = () => !docReady || (blankDoc && !curWork) || (!hasUnsaved() && !nameDirty) || keptSeq === changeSeq;
 function saveErrorText(){
   if (!vaultOK) return 'このブラウザでは、端末に保存できない設定になっています';
   return saveError && saveError.name === 'QuotaExceededError' ? '端末の空き容量が足りません' : 'ブラウザに保存するときにエラーが起きました';
@@ -3980,7 +3980,7 @@ function renderSavedStatus(){
   const inFile = keptSeq === changeSeq && hasUnsaved() ? 'いまの絵は .nijimi ファイルに保存してあります。' : '';
   if (!docReady) st0.textContent = '';
   else if (!vaultOK) line('savedng', WARN, 'この端末には保存できません', `${saveErrorText()}。.nijimi ファイルで保存してください。${inFile}`);
-  else if (saveError && hasUnsaved()) line('savedng', WARN, '最新の変更を保存できていません',
+  else if (saveError && (hasUnsaved() || nameDirty)) line('savedng', WARN, '最新の変更を保存できていません',
     `${saveErrorText()}。下の「.nijimi で保存」でファイルにしてください。いらない作品を削除すると、また保存できることがあります。` + inFile + (me ? `（作品一覧には ${workWhen(me)} の状態が残っています）` : ''));
   else if (hasUnsaved() || (nameDirty && me)) line('savedwait', '', '保存しています…', '最新の変更をこの端末に書き込んでいます。');
   else if (me) line('savedok', CHECK, 'この作品は保存済みです', `「${workTitle(me)}」· ${workWhen(me)} に保存 · ${fmtSize(me.bytes || 0)}。描くたびに自動で保存されます。`);
