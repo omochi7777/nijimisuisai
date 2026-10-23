@@ -21,7 +21,7 @@
    Look: natural sketchbook — linen-coloured chrome with a faint paper grain, moss-green accent, hand-lettered headings. */
 :root{
   --chrome:#efeae1; --panel:#fbf8f2; --line:#ddd5c8; --ink:#2e2a25; --muted:#766d62;
-  --accent:#4f6f52; --accent-ink:#ffffff; --active:#e3eadb; --stage:#d2cbbf; --warn:#a2452f; --wet:#3c6fa6;
+  --accent:#4f6f52; --accent-ink:#ffffff; --active:#e3eadb; --stage:#d2cbbf; --warn:#a2452f; --wet:#3c6fa6; --caution:#9a6412;
   --font-ui:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;
   --font-hand:"Klee One","Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic UI",sans-serif;
   --font-display:var(--font-hand);
@@ -31,10 +31,10 @@
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --chrome:#211f1b; --panel:#2a2722; --line:#3e3931; --ink:#ece6dc; --muted:#a69d90;
-  --accent:#a3c29a; --accent-ink:#17200f; --active:#36402f; --stage:#141310; --warn:#e3967f; --wet:#86b6e8; color-scheme:dark } }
+  --accent:#a3c29a; --accent-ink:#17200f; --active:#36402f; --stage:#141310; --warn:#e3967f; --wet:#86b6e8; --caution:#e8b45c; color-scheme:dark } }
 :root[data-theme="dark"]{
   --chrome:#211f1b; --panel:#2a2722; --line:#3e3931; --ink:#ece6dc; --muted:#a69d90;
-  --accent:#a3c29a; --accent-ink:#17200f; --active:#36402f; --stage:#141310; --warn:#e3967f; --wet:#86b6e8; color-scheme:dark }
+  --accent:#a3c29a; --accent-ink:#17200f; --active:#36402f; --stage:#141310; --warn:#e3967f; --wet:#86b6e8; --caution:#e8b45c; color-scheme:dark }
 
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
@@ -222,6 +222,11 @@ button,input,select{font:inherit;color:inherit}
 .wswarn{margin:0;font-size:13.5px;line-height:1.6;color:var(--ink)}
 .wswarn b{color:var(--warn)}
 #savedStatus .savedok{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:700;color:var(--accent)}
+#savedStatus .savedng{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:700;color:var(--caution)}
+#savedStatus .savedng svg{width:20px;height:20px;flex:none}
+#lossDlg{position:fixed;inset:0;z-index:53;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
+#lossDlg .sheet{width:min(380px,100%);max-height:100%;overflow-y:auto;box-sizing:border-box;background:var(--panel);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+.losstitle{font-size:16px;color:var(--caution)}
 #savedStatus .savedok svg{width:20px;height:20px;flex:none}
 #savedStatus .savedsub{display:block;margin-top:2px}
 .resume h2{margin:4px 0 8px}
@@ -767,6 +772,17 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <button class="btn" id="njSave">.nijimi で保存</button>
     </div>
     <div class="acts"><a class="btn primary" id="dlLink" download="nijimi.png" href="#">PNGをダウンロード</a><button class="btn" id="closeModal">閉じる</button></div>
+  </div>
+</div>
+<div id="lossDlg" hidden>
+  <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="lossTitle" aria-describedby="lossMsg">
+    <b class="losstitle" id="lossTitle">いまの絵を保存できませんでした</b>
+    <p class="wswarn" id="lossMsg"></p>
+    <div class="wsacts">
+      <button class="btn primary big" id="lossSave">.nijimi ファイルで保存する</button>
+      <button class="btn big danger-o" id="lossGo">保存しないで進む</button>
+      <button class="btn big" id="lossNo">やめる</button>
+    </div>
   </div>
 </div>
 <div id="workSheet" hidden>
@@ -3322,11 +3338,34 @@ function captureDrawing(){
 }
 let saveTimer = 0, saving = false, saveGen = 0, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
 const newWorkId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-// before the paper changes to another picture: write the pending save of the one leaving, so its last strokes are kept
+// changeSeq counts changes to the picture; savedSeq is the count the last save that reached the device covered.
+// saveError is why the last attempt failed (cleared by the next one that works)
+let changeSeq = 0, savedSeq = 0, saveError = null;
+const hasUnsaved = () => changeSeq !== savedSeq && !(blankDoc && !curWork);   // an untouched new sheet has nothing to lose
+const settleSaved = () => { savedSeq = changeSeq; saveError = null; };   // a picture just opened or started matches what is stored
+// before the paper changes to another picture: write the pending save of the one leaving, so its last strokes are kept.
+// Answers whether everything is now on the device (where the device cannot store at all, there is nothing to protect)
 async function flushSave(){
   while (saving) await new Promise(r => setTimeout(r, 50));
-  if (saveTimer) { clearTimeout(saveTimer); saveTimer = 0; await saveDrawing(); }
+  clearTimeout(saveTimer); saveTimer = 0;
+  if (vaultOK && docReady && hasUnsaved()) await saveDrawing();   // also retries a save that failed earlier
+  return !vaultOK || !docReady || !hasUnsaved();
 }
+function saveErrorText(){ return saveError && saveError.name === 'QuotaExceededError' ? '端末の空き容量が足りません' : 'ブラウザに保存するときにエラーが起きました'; }
+// leaving a picture whose latest changes could not be stored: stop and offer the file instead of losing them quietly
+async function guardLeave(){
+  if (await flushSave()) return true;
+  return new Promise(res => {
+    $('#lossMsg').textContent = `${saveErrorText()}。このまま進むと、いま描いている絵の最後の変更が失われます。.nijimi ファイルで保存してから進んでください。いらない作品を削除すると、また保存できることがあります。`;
+    $('#lossDlg').hidden = false;
+    const done = v => { $('#lossDlg').hidden = true; ['lossSave', 'lossGo', 'lossNo'].forEach(id => { $('#' + id).onclick = null; }); res(v); };
+    $('#lossSave').onclick = () => { done(false); closeStart(); $('#saveBtn').click(); };
+    $('#lossGo').onclick = () => done(true);
+    $('#lossNo').onclick = () => done(false);
+    setTimeout(() => $('#lossSave').focus({ preventScroll:true }), 30);
+  });
+}
+addEventListener('beforeunload', e => { if (saveError && hasUnsaved()) { e.preventDefault(); e.returnValue = ''; } });   // closing the tab: the browser asks
 // ask the browser not to clear the works when space runs low. Only where it answers quietly (Chromium, or an installed app):
 // elsewhere it would pop up a question nobody expects
 let storageAsked = false;
@@ -3335,7 +3374,9 @@ function keepStorage(){
   storageAsked = true; navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => {});
 }
 function markChanged(){
-  if (!docReady || restoring || !vaultOK) return;
+  if (!docReady || restoring) return;
+  changeSeq++;
+  if (!vaultOK) return;
   clearTimeout(saveTimer); saveTimer = setTimeout(saveDrawing, 2500);
 }
 async function saveDrawing(){
@@ -3344,6 +3385,7 @@ async function saveDrawing(){
   if (!curWork && blankDoc) { saveTimer = 0; return; }   // an untouched sheet does not become an empty work in the list
   saving = true; saveTimer = 0;
   const gen = saveGen;   // bumped when the save is deleted: a save still compressing must not bring it back
+  const seq = changeSeq;   // the changes this save will cover
   try {
     const { raw, simRaw, meta, thumb } = captureDrawing();
     if (!curWork) curWork = newWorkId();
@@ -3356,11 +3398,13 @@ async function saveDrawing(){
     const card = { id, name: meta.name, savedAt: meta.savedAt, w: meta.w, h: meta.h, paper: meta.paper, layers: meta.layers.length, bytes, thumb };
     await vault.setMany({ ['work:' + id]: { meta, data, simData }, ['info:' + id]: card });
     const i = works.findIndex(w => w.id === id); if (i >= 0) works.splice(i, 1); works.unshift(card);
+    if (id === curWork) { savedSeq = seq; saveError = null; }   // changes made while it compressed are still waiting for the next save
     if (!store.get('tip:saved', false)) { store.set('tip:saved', true); toast('描いた絵は、この端末の作品一覧に自動で保存されます'); }
     keepStorage();
   } catch (err) {
     console.warn('save failed', err);
-    if (err && err.name === 'QuotaExceededError') toast('端末の空き容量が足りず、保存できませんでした');
+    saveError = err || new Error('save failed');
+    toast(err && err.name === 'QuotaExceededError' ? '端末の空き容量が足りず、保存できませんでした。「保存」から .nijimi ファイルにしてください' : 'この端末に保存できませんでした。「保存」から .nijimi ファイルにしてください');
   } finally { saving = false; }
 }
 // unpack everything before touching the document: whatever runs during these waits (a key, a timer) only meets the old picture,
@@ -3426,6 +3470,7 @@ async function checkSaved(){
 }
 const workTitle = w => w.name || '無題';
 function workWhen(w){ const d = new Date(w.savedAt), pad = n => String(n).padStart(2, '0'); return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+const WARN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/></svg>';
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17 19 7"/></svg>';
 const isHere = w => w.id === curWork && docReady;   // the work on the paper right now
 let selecting = false, picked = new Set();
@@ -3514,7 +3559,8 @@ async function deleteWorks(ids){
   toast(one ? `「${workTitle(one)}」を削除しました` : `${ids.length} 件の作品を削除しました`);
 }
 async function duplicateWork(id){
-  if (id === curWork) await flushSave();   // copy what is on the paper now, not the last save
+  // copy what is on the paper now, not the last save; if that cannot be stored, the copy is of the stored state and says so
+  const stale = id === curWork && !await flushSave();
   const rec = await vault.get('work:' + id), w = works.find(x => x.id === id);
   if (!rec || !w) { toast('この作品が見つかりませんでした'); return; }
   const nid = newWorkId(), name = `${workTitle(w)}のコピー`.slice(0, 60), now = Date.now();
@@ -3522,7 +3568,7 @@ async function duplicateWork(id){
   try { await vault.setMany({ ['work:' + nid]: { ...rec, meta: { ...rec.meta, name, savedAt: now } }, ['info:' + nid]: card }); }
   catch (e) { toast(e && e.name === 'QuotaExceededError' ? '端末の空き容量が足りず、複製できませんでした' : '複製できませんでした'); return; }
   works.unshift(card); renderWorks();
-  toast(`「${name}」を作りました`);
+  toast(stale ? `「${name}」を作りました（最新の変更は保存できていないため、作品一覧にあった状態の複製です）` : `「${name}」を作りました`);
 }
 $('#brandBtn').addEventListener('click', () => { if (stroke) return; if (xf) xfEnd(true); openStart(false); showResumeView(true); });
 let opening = false;
@@ -3531,13 +3577,13 @@ async function openWork(id){
   if (id === curWork && docReady) { closeStart(); return; }
   opening = true; $('#resume').classList.add('busy');
   try {
-    await flushSave();
+    if (!await guardLeave()) return;
     const rec = await vault.get('work:' + id), w = works.find(x => x.id === id);
     if (!rec) { toast('この作品が見つかりませんでした'); works = works.filter(x => x.id !== id); renderWorks(); return; }
     if (stroke) cancelStroke();
     const ok = await restoreDrawing(rec);
     if (ok) curWork = id;
-    closeStart(); docReady = true;
+    closeStart(); docReady = true; settleSaved();
     if (ok) toast(`「${w ? workTitle(w) : '作品'}」の続きから描けます`);
   } finally { opening = false; $('#resume').classList.remove('busy'); }
 }
@@ -3622,7 +3668,7 @@ $('#njSave').addEventListener('click', async () => {
 });
 async function openNijimiFile(file){
   let d;
-  await flushSave();
+  if (!await guardLeave()) return;
   restoring = true;
   try { d = await decodeDrawing(await readNijimi(file)); }
   catch (err) {
@@ -3728,7 +3774,7 @@ $$('#imgDlg [data-mode]').forEach(b => b.addEventListener('click', async () => {
   const p = imgPick; if (!p) return;
   const lut = adjLuts();
   imgPick = null; $('#imgDlg').hidden = true;   // the bitmap stays open until it is placed
-  if (p.fresh) await newPaper();   // the paper and size picked on the start screen
+  if (p.fresh && !await newPaper()) { p.bmp.close(); return; }   // the paper and size picked on the start screen
   imgPick = p;
   const placed = importImage(p.bmp, b.dataset.mode, p.name, lut);
   closeImgDlg();
@@ -3755,7 +3801,11 @@ async function showSaved(){
   st0.textContent = '保存しています…';
   await flushSave();
   const me = works.find(w => w.id === curWork);
-  if (me) {
+  if (saveError && hasUnsaved()) {
+    st0.innerHTML = `<span class="savedng">${WARN}最新の変更を保存できていません</span><span class="savedsub"></span>`;
+    st0.querySelector('.savedsub').textContent = `${saveErrorText()}。下の「.nijimi で保存」でファイルにしてください。いらない作品を削除すると、また保存できることがあります。`
+      + (me ? `（作品一覧には ${workWhen(me)} の状態が残っています）` : '');
+  } else if (me) {
     st0.innerHTML = `<span class="savedok">${CHECK}この作品は保存済みです</span><span class="savedsub"></span>`;
     st0.querySelector('.savedsub').textContent = `「${workTitle(me)}」· ${workWhen(me)} に保存 · ${fmtSize(me.bytes || 0)}。描くたびに自動で保存されます。`;
   }
@@ -3862,14 +3912,15 @@ function buildStart(){
 // a fresh sheet with the paper and size picked on the start screen
 async function newPaper(){
   const firstRun = st.first;
-  await flushSave();   // the picture leaving keeps its last strokes in the works
+  if (!await guardLeave()) return false;   // the picture leaving keeps its last strokes in the works, or the user decides
   const z = SIZES.find(x => x.k === st.size) || SIZES[0];
   if (stroke) cancelStroke();
   S.paper = st.paper; saveSettings();
   try { createDoc(z.w, z.h, st.q); }
   catch (err) { console.error(err); toast('メモリが足りないため、小さめ・軽量の紙にしました'); createDoc(1000, 750, .5); }
-  syncSettings(); closeStart(); docReady = true;
+  syncSettings(); closeStart(); docReady = true; settleSaved();
   toast(firstRun && isNarrow() ? '道具をもう一度タップで太さなどの調整、右上の丸で色とパレット' : `${PAPER_INFO[S.paper].name}（${z.label}）を用意しました`);
+  return true;
 }
 function syncStart(){
   $$('#paperCards .pcard').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === st.paper)));
