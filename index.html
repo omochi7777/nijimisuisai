@@ -308,11 +308,18 @@ button,input,select{font:inherit;color:inherit}
 .startcard h2{margin:2px 0 -4px;font-family:var(--font-hand);font-weight:600;font-size:16px}
 .papers{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .pcard{display:flex;flex-direction:column;gap:6px;padding:6px 6px 9px;border:1.5px solid var(--line);border-radius:14px;background:var(--panel);cursor:pointer;text-align:left;min-width:0}
-.pcard .thumb{width:100%;aspect-ratio:4/3;border-radius:9px;background-size:cover;background-color:#f4f1ea;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.pcard .thumb{width:100%;aspect-ratio:4/3;border-radius:9px;background-size:cover;background-color:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
 .pcard b{font-size:13px;font-weight:700;padding:0 3px}
 .pcard small{font-size:11px;color:var(--muted);line-height:1.45;padding:0 3px}
 .pcard[aria-pressed="true"]{border-color:var(--accent);background:var(--active)}
 .sizes{display:flex;flex-wrap:wrap;gap:8px}
+.tints{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tints button,.tints label{position:relative;width:30px;height:30px;border-radius:50%;border:1px solid rgba(0,0,0,.18);cursor:pointer;padding:0;flex:none;box-sizing:border-box}
+.tints [aria-pressed="true"]{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent)}
+.tints .own{background:#f6f3ec;font-size:9.5px;color:#6b6358;display:flex;align-items:center;justify-content:center;line-height:1}
+.tints label{background:conic-gradient(#e9a0a0,#e9d79a,#a8d8a0,#9cc8e6,#c2a8e0,#e9a0a0);overflow:hidden}
+.tints label input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:0;padding:0}
+.pcard .thumb{background-blend-mode:multiply}
 .sizes button{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px 0 10px;border:1.5px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;font-size:12.5px}
 .sizes button i{display:block;border:1.5px solid currentColor;border-radius:2px;opacity:.6}
 .sizes button[aria-pressed="true"]{border-color:var(--accent);background:var(--active);font-weight:700}
@@ -701,6 +708,8 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <button class="btn primary" id="paperBtn2">新しい紙を選ぶ</button>
       <div class="ph"><span class="ptitle">紙の質感<small class="hint" style="font-family:var(--font-ui);margin-left:6px">描いたまま変更できます</small></span><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="seg" id="paperSeg"></div>
+      <div class="tints" id="tintSet" aria-label="紙の色"></div>
+      <p class="hint tinthint" hidden>濃い色の紙では、透明な水彩や鉛筆・インクは見えにくくなります。ガッシュや白で描くのに向いています。</p>
       <button class="nlink" data-note="paper" style="margin-top:-4px">紙のちがいを見る</button>
       <button class="btn" id="sizeBtn">紙の大きさを変える <span class="mono" id="sizeNow"></span></button>
       <label class="check"><input type="checkbox" id="flatPaper"><span>紙目を表示しない（見た目だけ。にじみ方は変わりません）</span></label>
@@ -764,6 +773,9 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <button class="more" id="backResume" hidden>← 前回の絵に戻る</button>
     <h2>紙</h2>
     <div class="papers" id="paperCards"></div>
+    <h2>紙の色</h2>
+    <div class="tints" id="tintStart"></div>
+    <p class="hint tinthint" hidden>濃い色の紙では、透明な水彩や鉛筆・インクは見えにくくなります。ガッシュや白で描くのに向いています。</p>
     <h2>大きさ</h2>
     <div class="sizes" id="sizeChips"></div>
     <button class="more" id="moreBtn" aria-expanded="false" aria-controls="moreBox">細かく設定する ＋</button>
@@ -779,7 +791,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <p class="hint" id="startWarn" hidden>新しい紙にすると、今の絵は消えます（必要なら先に「保存」してください）。</p>
       <button class="more" data-open title="にじみ帖のファイル（.nijimi）で続きから描く、または画像を読み込む">ファイルを開く（.nijimi・画像）</button>
       <button class="more" id="startSize" hidden>いまの紙の大きさを変える</button>
-      <button class="btn" id="startKeep" hidden>紙の質感だけ変える</button>
+      <button class="btn" id="startKeep" hidden>紙の種類と色だけ変える</button>
       <button class="btn primary big" id="startGo">この紙で描きはじめる</button>
     </div>
     </div>
@@ -1600,7 +1612,7 @@ function currentColor(){
 }
 
 let doc = { w:1600, h:1200 }, sim = { w:1600, h:1200 }, simQ = 1;
-let paperTex, paperFbo, paperSeed = Math.random() * 100, paperOff = [0, 0];
+let paperTex, paperFbo, paperSeed = Math.random() * 100, paperOff = [0, 0], paperTint = null;   // paperTint: a tinted sheet ('#rrggbb'), or null for the paper's own white
 let layers = [], active = null, layerSeq = 1, docName = '', curWork = null, blankDoc = true;   // blankDoc: a fresh sheet nothing has been done to yet   // docName: the picture's name; curWork: its id in the device's works (none until first saved)
 const W = [], P = [], D = [], F = [], simFbo = [], fW = [], fP = [], fD = [], fF = [];
 let si = 0, fi = 0;
@@ -1657,7 +1669,7 @@ function freeDoc(){
 }
 function createDoc(w, h, q, seed, off){
   freeDoc();
-  docName = ''; curWork = null; blankDoc = true; nameDirty = false;
+  docName = ''; curWork = null; blankDoc = true; nameDirty = false; paperTint = null;
   allocSheet(w, h, q, seed, off);
   layerSeq = 1;
   addLayer('水彩'); addLayer('線画');
@@ -2252,12 +2264,14 @@ function readStageBg(){
 
 // the paper's relief as drawn on screen and in exports; "flat paper" hides it (the water still follows the real one)
 function paperShade(){ return S.flatPaper ? 0 : PAPERS[S.paper].shade; }
+function paperCol(){ return paperTint ? hexRgb(paperTint) : PAPERS[S.paper].col; }
+const validTint = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null;
 // how strongly a layer shows; its wet paint, gloss and damp paper all follow the same number
 function layerOp(L){ return L && L.visible ? L.opacity : 0; }
 function composite(){
   gl.disable(gl.BLEND); target(null);
   const pp = PAPERS[S.paper];
-  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:paperShade(), u_paperCol:pp.col, u_bg:stageBg,
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:paperShade(), u_paperCol:paperCol(), u_bg:stageBg,
     u_doc:[doc.w, doc.h], u_canvas:[canvas.width, canvas.height], u_view:[view.x * DPR, view.y * DPR, view.z * DPR], u_rot:[Math.cos(view.r), Math.sin(view.r)], u_export:0 };
   const op = new Float32Array(8);
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
@@ -3087,7 +3101,7 @@ function buildSettings(){
   $('#runout').checked = S.runout; $('#runout').addEventListener('change', e => { S.runout = e.target.checked; saveSettings(); });
   syncSettings();
 }
-function syncSettings(){ $$('#paperSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === S.paper)); }
+function syncSettings(){ $$('#paperSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === S.paper)); if ($('#tintSet').sync) $('#tintSet').sync(); }
 
 const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.5 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4.4-1"/></svg>';
@@ -3290,7 +3304,7 @@ $('#saveBtn').addEventListener('click', () => {
   const t = mkTex(doc.w, doc.h, 'u8'), f = mkFbo([t]);
   gl.disable(gl.BLEND); target(f);
   const pp = PAPERS[S.paper];
-  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:paperShade(), u_paperCol:pp.col, u_bg:stageBg,
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:paperShade(), u_paperCol:paperCol(), u_bg:stageBg,
     u_doc:[doc.w, doc.h], u_canvas:[doc.w, doc.h], u_view:[0, 0, 1], u_rot:[1, 0], u_export:1 };
   const op = new Float32Array(8);
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
@@ -3394,7 +3408,7 @@ function thumbnail(){
   const t = mkTex(tw, th, 'u8'), f = mkFbo([t]);
   gl.disable(gl.BLEND); target(f);
   const pp = PAPERS[S.paper];
-  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:paperShade(), u_paperCol:pp.col, u_bg:stageBg,
+  const U = { u_W:W[si], u_P:P[si], u_D:D[si], u_paper:paperTex, u_granStr:S.gran / 100, u_shade:paperShade(), u_paperCol:paperCol(), u_bg:stageBg,
     u_doc:[doc.w, doc.h], u_canvas:[tw, th], u_view:[0, 0, sc], u_rot:[1, 0], u_export:1, u_gouache:GOUACHE_WHITE,
     u_wetIdx: simOwner ? layers.indexOf(simOwner) : -1, u_wetOp: simOwner ? layerOp(simOwner) : 1 };
   const op = new Float32Array(8);
@@ -3417,7 +3431,7 @@ function captureDrawing(){
     simRaw = readHalf(f, sim.w, sim.h); freeTF(t, f);
   }
   const meta = { v:1, w:doc.w, h:doc.h, q:simQ, paper:S.paper, seed:paperSeed, active: layers.indexOf(active), owner: simRaw ? layers.indexOf(simOwner) : -1,
-    layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), name: docName, poff: paperOff, savedAt: Date.now() };
+    layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), name: docName, poff: paperOff, tint: paperTint, savedAt: Date.now() };
   return { raw, simRaw, meta, thumb: thumbnail() };
 }
 let saveTimer = 0, saving = false, saveGen = 0, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
@@ -3524,7 +3538,7 @@ async function restoreDrawing(rec){
 }
 function applyDrawing({ m, px, simPx }){
   S.paper = PAPERS[m.paper] ? m.paper : 'cold'; saveSettings();
-  createDoc(m.w, m.h, m.q, m.seed, Array.isArray(m.poff) && m.poff.every(Number.isFinite) ? m.poff : null); docName = typeof m.name === 'string' ? m.name : ''; blankDoc = false;
+  createDoc(m.w, m.h, m.q, m.seed, Array.isArray(m.poff) && m.poff.every(Number.isFinite) ? m.poff : null); docName = typeof m.name === 'string' ? m.name : ''; paperTint = validTint(m.tint); blankDoc = false;
   while (layers.length < m.layers.length) addLayer();
   while (layers.length > m.layers.length) { const L = layers.pop(); freeTF(L.tex, L.fbo); }
   for (let i = 0; i < layers.length; i++) {
@@ -3731,7 +3745,7 @@ async function readNijimi(file){
   if (at > buf.byteLength) throw new Error('file is cut short');
   const part = b => ({ raw: h.enc === 'split16', split:true, buf:b });
   const n = h.layers.length, owner = Number.isInteger(h.owner) && h.owner >= 0 && h.owner < n && bufs.length > n ? h.owner : -1;
-  const meta = { name: cleanName(String(h.name || '')), poff: Array.isArray(h.poff) && h.poff.length === 2 && h.poff.every(Number.isFinite) ? h.poff : null, w:h.w, h:h.h, q:h.q, paper:h.paper, seed: +h.seed || 0, active: Number.isInteger(h.active) ? h.active : 0, owner,
+  const meta = { name: cleanName(String(h.name || '')), tint: validTint(h.tint), poff: Array.isArray(h.poff) && h.poff.length === 2 && h.poff.every(Number.isFinite) ? h.poff : null, w:h.w, h:h.h, q:h.q, paper:h.paper, seed: +h.seed || 0, active: Number.isInteger(h.active) ? h.active : 0, owner,
     layers: h.layers.map((L, i) => ({ name: String(L && L.name || 'レイヤー ' + (i + 1)).slice(0, 40), visible: !(L && L.visible === false), opacity: L && Number.isFinite(+L.opacity) ? clamp(+L.opacity, 0, 1) : 1 })) };
   return { meta, data: bufs.slice(0, n).map(part), simData: owner >= 0 ? part(bufs[n]) : null };
 }
@@ -4174,7 +4188,28 @@ const SIZES = [
   { k:'land', label:'横', w:1600, h:1200 }, { k:'port', label:'縦', w:1200, h:1600 }, { k:'sq', label:'正方形', w:1400, h:1400 },
   { k:'card', label:'はがき', w:1000, h:1480 }, { k:'small', label:'小さめ', w:1000, h:750, note:'軽い' }, { k:'big', label:'大判', w:2400, h:1800, note:'PC向け' },
 ];
-const st = { paper:S.paper, size: innerWidth >= innerHeight ? 'land' : 'port', q: isCoarse ? .5 : 1, first:true };
+const st = { paper:S.paper, tint:null, size: innerWidth >= innerHeight ? 'land' : 'port', q: isCoarse ? .5 : 1, first:true };
+// tinted sheets: light ones for watercolour, dark ones for gouache and white ink; and any colour at all
+const TINTS = [[null, '紙のまま'], ['#efe6d2', '生成り'], ['#f3e7c4', 'クリーム'], ['#dcdad5', 'グレー'], ['#dce9ef', '水色'], ['#f3e0e0', '桜'], ['#e3ecd4', '若草'], ['#2e3a52', '藍'], ['#2a2826', '墨']];
+const darkTint = v => { if (!v) return false; const c = hexRgb(v); return .3 * c[0] + .59 * c[1] + .11 * c[2] < .45; };
+function buildTints(box, get, set){
+  box.innerHTML = '';
+  TINTS.forEach(([v, name]) => {
+    const b = document.createElement('button'); b.dataset.v = v || ''; b.title = name; b.setAttribute('aria-label', '紙の色：' + name);
+    if (v) b.style.background = v; else { b.className = 'own'; b.textContent = '白'; }
+    b.addEventListener('click', () => set(v));
+    box.appendChild(b);
+  });
+  const l = document.createElement('label'); l.title = 'ほかの色'; l.innerHTML = '<input type="color" aria-label="紙の色：ほかの色">';
+  l.querySelector('input').addEventListener('input', e => set(validTint(e.target.value)));
+  box.appendChild(l);
+  box.sync = () => {
+    const v = get(), preset = TINTS.some(t => t[0] === v);
+    [...box.querySelectorAll('button')].forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v || null) === v)));
+    l.setAttribute('aria-pressed', String(!!v && !preset)); if (v && !preset) { l.style.background = v; l.querySelector('input').value = v; } else l.style.background = '';
+    const hint = box.nextElementSibling; if (hint && hint.classList.contains('tinthint')) hint.hidden = !darkTint(v);
+  };
+}
 function paperThumb(key, w, h){
   const pp = PAPERS[key];
   const t = mkTex(w, h, 'u8'), f = mkFbo([t]);
@@ -4193,6 +4228,10 @@ function paperThumb(key, w, h){
   cx.putImageData(img, 0, 0); return c.toDataURL();
 }
 function buildStart(){
+  buildTints($('#tintStart'), () => st.tint, v => { st.tint = v; syncStart(); });
+  // and the colour of the sheet on the desk, in the settings (only how the paper looks, so it can change while drawing)
+  buildTints($('#tintSet'), () => paperTint, v => { paperTint = v; dirty = true; $('#tintSet').sync(); markChanged(); });
+  $('#tintSet').sync();
   const pc = $('#paperCards');
   for (const k in PAPERS) {
     const b = document.createElement('button'); b.className = 'pcard'; b.dataset.k = k;
@@ -4218,7 +4257,7 @@ function buildStart(){
   bind('st_gran', () => S.gran, v => { S.gran = v; $('#gran').value = v; $('#granV').textContent = v + '%'; saveSettings(); dirty = true; });
   bind('st_dry', () => S.drySpd, v => setDrySpeed(v));
   $('#startGo').addEventListener('click', () => newPaper());
-  $('#startKeep').addEventListener('click', () => { S.paper = st.paper; saveSettings(); genPaper(); syncSettings(); closeStart(); markChanged(); toast(`紙の質感を「${PAPER_INFO[S.paper].name}」に変えました`); });
+  $('#startKeep').addEventListener('click', () => { S.paper = st.paper; paperTint = st.tint; saveSettings(); genPaper(); syncSettings(); closeStart(); markChanged(); toast(`紙を「${PAPER_INFO[S.paper].name}」${paperTint ? '（色つき）' : ''}に変えました`); });
   $('#startClose').addEventListener('click', closeStart);
   $('#start').addEventListener('pointerdown', e => { if (e.target.id === 'start' && !st.first) closeStart(); });
 }
@@ -4231,18 +4270,20 @@ async function newPaper(){
   S.paper = st.paper; saveSettings();
   try { createDoc(z.w, z.h, st.q); }
   catch (err) { console.error(err); toast('メモリが足りないため、小さめ・軽量の紙にしました'); createDoc(1000, 750, .5); }
+  paperTint = st.tint;
   syncSettings(); closeStart(); docReady = true; settleSaved();
   toast(firstRun && isNarrow() ? '道具をもう一度タップで太さなどの調整、右上の丸で色とパレット' : `${PAPER_INFO[S.paper].name}（${z.label}）を用意しました`);
   return true;
 }
 function syncStart(){
-  $$('#paperCards .pcard').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === st.paper)));
+  $$('#paperCards .pcard').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.k === st.paper)); b.querySelector('.thumb').style.backgroundColor = st.tint || '#fff'; });
+  $('#tintStart').sync();
   $$('#sizeChips button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === st.size)));
   $$('#qSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.q === st.q)));
   [['st_bleed', S.bleed], ['st_vein', S.vein], ['st_gran', S.gran], ['st_dry', S.drySpd]].forEach(([id, v]) => { $('#' + id).value = v; $('#' + id + 'V').textContent = v + '%'; });
 }
 function openStart(first){
-  st.first = first; st.paper = S.paper;
+  st.first = first; st.paper = S.paper; st.tint = first ? null : paperTint;
   if (!first) {
     const cur = SIZES.find(z => z.w === doc.w && z.h === doc.h); if (cur) st.size = cur.k; st.q = simQ;
   }
