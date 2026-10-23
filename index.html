@@ -94,6 +94,19 @@ button,input,select{font:inherit;color:inherit}
 /* stage */
 #stage{grid-row:2;grid-column:2;position:relative;overflow:hidden;background:var(--stage);touch-action:none}
 #view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:none}
+#view.xf{cursor:move}
+#xfBox{position:absolute;left:0;top:0;transform-origin:0 0;border:1.5px dashed var(--accent);box-shadow:0 0 0 1px rgba(255,255,255,.55);pointer-events:none;z-index:4;box-sizing:border-box}
+#xfBox i{position:absolute;width:12px;height:12px;margin:-7px 0 0 -7px;background:var(--panel);border:2px solid var(--accent);border-radius:3px;box-sizing:border-box}
+#xfBox i:nth-child(1){left:0;top:0} #xfBox i:nth-child(2){left:100%;top:0} #xfBox i:nth-child(3){left:100%;top:100%} #xfBox i:nth-child(4){left:0;top:100%}
+@media (pointer:coarse){ #xfBox i{width:18px;height:18px;margin:-10px 0 0 -10px} }
+#xfBar{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:8;display:flex;align-items:center;gap:8px;padding:7px 8px 7px 12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 26px rgba(60,45,25,.18);max-width:calc(100% - 24px);box-sizing:border-box}
+.xftext{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.xftext b{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xfhint{font-size:11px;color:var(--muted);white-space:nowrap}
+@media (max-width:760px){ #xfBar{left:8px;right:8px;top:8px;transform:none;z-index:12} .xftext{flex:1} }   /* phones: across the top, over the colour chip while moving */
+@media (max-width:560px){ .xfhint{display:none} }
+.lyacts{display:flex;gap:6px}
+.lyacts .btn{flex:1;padding:0 8px}
 #cursor{position:absolute;left:0;top:0;pointer-events:none;border-radius:50%;border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(0,0,0,.55);transform:translate(-100px,-100px);display:none}
 #cursor.dot{border-radius:50%}
 
@@ -473,6 +486,13 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
   <main id="stage">
     <canvas id="view"></canvas>
     <div id="cursor"></div>
+    <div id="xfBox" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div id="xfBar" hidden role="toolbar" aria-label="レイヤーの移動・拡大">
+      <span class="xftext"><b id="xfName"></b><span class="xfhint">ドラッグで移動・四隅で拡大縮小</span></span>
+      <span class="mono" id="xfPct">100%</span>
+      <button class="btn" id="xfCancel" title="やめる (Esc)">やめる</button>
+      <button class="btn primary" id="xfOk" title="確定 (Enter)">確定</button>
+    </div>
     <div id="scrim" hidden></div>
 
     <button id="colorChip" aria-expanded="false" aria-controls="colorDrawer" title="色とパレット">
@@ -549,7 +569,10 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
       <div class="ph"><span class="ptitle">レイヤー</span><span style="display:flex;gap:6px"><button class="btn" id="addLayer" title="レイヤーを追加">＋ 追加</button><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span></div>
       <ul id="layerList"></ul>
       <button class="btn" id="clearLayer">選択中のレイヤーを白紙に戻す</button>
-      <button class="btn" id="imgLayer" title="PNG・JPGなどの画像を新しいレイヤーとして読み込む">画像を読み込む</button>
+      <div class="lyacts">
+        <button class="btn" id="imgLayer" title="PNG・JPGなどの画像を新しいレイヤーとして読み込む">画像を読み込む</button>
+        <button class="btn" id="xfLayer" title="選択中のレイヤーを動かす・大きさを変える (V)">移動・拡大</button>
+      </div>
       <p class="hint">水彩・鉛筆・インクは透明で、重ねると下の色と混ざって深くなります（減法混色）。ガッシュは不透明なので、上のレイヤーほど手前に来ます。<span style="color:var(--wet)">●</span> は濡れた絵の具が乗っているレイヤーです。</p>
     </section>
 
@@ -896,6 +919,15 @@ const FS_WETMAP = HEAD + `
 uniform sampler2D u_W; uniform vec2 u_size;
 out vec4 o;
 void main(){ vec4 w = texture(u_W, gl_FragCoord.xy / u_size); o = vec4(clamp(w.r * 10., 0., 1.), clamp(w.g, 0., 1.), 0., 1.); }`;
+const FS_XFORM = HEAD + `
+uniform sampler2D u_src; uniform vec2 u_doc; uniform vec3 u_xf;   // u_xf: x, y, scale. A paper point p shows the original at (p - xy) / scale
+uniform float u_lod;   // which mipmap to read when shrinking; given outright, since the edge of the picture would upset an automatic choice
+out vec4 o;
+void main(){
+  vec2 q = (gl_FragCoord.xy - u_xf.xy) / u_xf.z;
+  vec4 c = textureLod(u_src, q / u_doc, u_lod);
+  o = (q.x < 0. || q.y < 0. || q.x > u_doc.x || q.y > u_doc.y) ? vec4(0) : c;
+}`;
 const FS_SUM = HEAD + `
 uniform sampler2D u_P, u_D;
 out vec4 o;
@@ -1173,7 +1205,7 @@ try {
     paper: program(VS_FULL, FS_PAPER), flux: program(VS_FULL, FS_FLUX), update: program(VS_FULL, FS_UPDATE),
     finalize: program(VS_FULL, FS_FINALIZE), bake: program(VS_FULL, FS_BAKE), comp: program(VS_FULL, FS_COMP),
     brush: program(VS_DAB, FS_BRUSH), simErase: program(VS_DAB, FS_SIMERASE), layerErase: program(VS_DAB, FS_LAYERERASE),
-    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE),
+    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM),
   };
 } catch (err) { fatal('シェーダーの準備に失敗しました: ' + err.message); console.error(err); return; }
 
@@ -1375,6 +1407,7 @@ let scratch, scratchF, backup, backupF;
 let simOwner = null, simHasContent = false, simSteps = 0, simBoost = 1, simTime = 0, swirlClock = 0;   // swirlClock never jumps, so eddies drift smoothly
 let view = { x:0, y:0, z:1, r:0 }, dirty = true;   // x, y: where the paper's corner sits on screen; z: zoom; r: turn (radians, clockwise)
 let undoStack = [], redoStack = [], undoBytes = 0;
+let xf = null;   // a layer being moved / scaled: see "moving a layer"
 const UNDO_BUDGET = (isCoarse ? 200 : 520) * 1024 * 1024;
 
 function simParams(){
@@ -1397,6 +1430,7 @@ function dryStepsFull(){ const p = simParams(); return Math.ceil(1.3 / p.evap + 
 
 /* ================= document ================= */
 function freeDoc(){
+  if (xf) { freeTF(xf.t, xf.f); xf = null; syncXfUI(); }
   for (const L of layers) freeTF(L.tex, L.fbo);
   for (let i = 0; i < 2; i++) { [W, P, D, F].forEach(a => a[i] && gl.deleteTexture(a[i])); [simFbo, fW, fP, fD, fF].forEach(a => a[i] && gl.deleteFramebuffer(a[i])); }
   freeTF(paperTex, paperFbo); freeTF(scratch, scratchF); freeTF(backup, backupF);
@@ -1516,6 +1550,7 @@ function freePart(p){
 function freeEntry(e){ e.parts.forEach(freePart); undoBytes -= e.bytes; }
 function clearUndo(){ undoStack.forEach(freeEntry); redoStack.forEach(freeEntry); undoStack = []; redoStack = []; undoBytes = 0; }
 function pushUndo(parts){
+  if (xf) xfEnd(true);
   const e = { parts, bytes: parts.reduce((a, p) => a + p.bytes, 0) };
   redoStack.forEach(freeEntry); redoStack = [];
   undoStack.push(e); undoBytes += e.bytes;
@@ -1537,6 +1572,7 @@ function restorePart(p){
 }
 function swapEntry(from, to){
   if (stroke) return;
+  if (xf) { xfEnd(false); toast('移動・拡大をやめました'); return; }
   tips.length = 0;
   const e = from.pop(); if (!e) return;
   undoBytes -= e.bytes;
@@ -2105,6 +2141,7 @@ canvas.addEventListener('pointerdown', e => {
     if (!S.penOnly && isCoarse) { S.penOnly = true; $('#penOnly').checked = true; saveSettings(); toast('ペンを検出しました。指はスクロールと拡大に使います（設定で変更できます）'); }
   }
   if (!isNarrow() && !$('#settings').hidden) { /* keep */ }
+  if (xf && xfDown(e)) return;
   if (e.pointerType === 'touch') {
     pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
     if (pointers.size === 1) tap = { t0:performance.now(), n:1, moved:0, start:new Map(), v:{ ...view } };
@@ -2129,6 +2166,7 @@ canvas.addEventListener('pointerdown', e => {
   if (stroke) stroke.pSm = pt.p;
 });
 canvas.addEventListener('pointermove', e => {
+  if (xf && xfMove(e)) return;
   if (e.pointerType === 'touch' && pointers.has(e.pointerId)) {
     pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
     if (tap && tap.start.has(e.pointerId)) { const s0 = tap.start.get(e.pointerId); tap.moved = Math.max(tap.moved, Math.hypot(e.clientX - s0.x, e.clientY - s0.y)); }
@@ -2148,6 +2186,7 @@ let tap = null, lastTap = null;
 // a quick tap with fingers (short, barely moving) is a shortcut, not a gesture
 function fingerTap(e){
   if (!tap || pointers.size) return;
+  if (xf) { tap = null; return; }   // pinching a layer is not a two-finger undo
   const t = tap, now = performance.now(); tap = null;
   if (now - t.t0 > 320 || t.moved > 14) { lastTap = null; return; }
   if (t.n >= 2) {
@@ -2163,6 +2202,7 @@ function fingerTap(e){
   } else lastTap = { t:now, x:e.clientX, y:e.clientY };
 }
 function pointerEnd(e){
+  if (xf) xfUp(e);
   if (e.pointerType === 'touch') {
     pointers.delete(e.pointerId);
     if (gesture) { if (pointers.size) gestureBase(); else gesture = null; }
@@ -2180,12 +2220,148 @@ canvas.addEventListener('wheel', e => {
   const x = e.clientX - stageRect.left, y = e.clientY - stageRect.top;
   // ctrl+wheel / trackpad pinch / notched mouse wheel → zoom; two-finger trackpad scroll → pan
   const notched = e.deltaMode === 1 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 50 && Number.isInteger(e.deltaY));
+  if (xf && (e.ctrlKey || e.metaKey || notched)) { xfWheel(e); return; }
   if (e.ctrlKey || e.metaKey || notched) {
     const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
     zoomAt(x, y, Math.exp(-dy * (e.ctrlKey ? .01 : .0015)));
   } else { view.x -= e.deltaX; view.y -= e.deltaY; dirty = true; }
 }, { passive:false });
 ['gesturestart', 'gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+
+/* ================= moving a layer: drag to move, corners / pinch / wheel to scale, then settle or call it off ================= */
+// The layer is redrawn from an untouched copy on every change, so however much it is pushed around it is resampled only once.
+// xf: { L, t, f: the copy, box: the drawn area in paper pixels, tx, ty, s, drag, pinch }
+function contentBox(L){
+  const px = readHalf(L.fbo, doc.w, doc.h), w = doc.w;
+  let x0 = w, y0 = doc.h, x1 = -1, y1 = -1;
+  for (let y = 0; y < doc.h; y++) {
+    let a = -1, b = -1;
+    for (let i = y * w * 4, x = 0; x < w; x++, i += 4) {
+      // anything above about 0.004 in any channel counts as drawn (half-float bits, sign dropped)
+      if ((px[i] & 0x7fff) >= 0x1C00 || (px[i + 1] & 0x7fff) >= 0x1C00 || (px[i + 2] & 0x7fff) >= 0x1C00 || (px[i + 3] & 0x7fff) >= 0x1C00) { if (a < 0) a = x; b = x; }
+    }
+    if (a >= 0) { if (a < x0) x0 = a; if (b > x1) x1 = b; if (y < y0) y0 = y; y1 = y; }
+  }
+  return x1 < 0 ? null : { x:x0, y:y0, w:x1 - x0 + 1, h:y1 - y0 + 1 };
+}
+function xfStart(L, box){
+  if (stroke || xf || !L) return;
+  if (simOwner === L && simHasContent) { bakeSim(true); toast(`「${L.name}」の濡れた絵の具を乾かして定着させました`); }
+  box = box || contentBox(L);
+  if (!box) { toast('このレイヤーには何も描かれていません'); return; }
+  const t = mkTex(doc.w, doc.h), f = mkFbo([t]);
+  blit(L.fbo, f, 0, 0, doc.w, doc.h, 0, 0);
+  gl.bindTexture(gl.TEXTURE_2D, t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.generateMipmap(gl.TEXTURE_2D);
+  setHand(false);
+  xf = { L, t, f, box, tx:0, ty:0, s:1, drag:null, pinch:null };
+  if (isNarrow()) { ['props', 'layers', 'settings'].forEach(k => $('#' + k).hidden = true); syncPanelBtns(); }
+  cursorEl.style.display = 'none';
+  syncXfUI(); dirty = true;
+}
+function xfApply(){
+  gl.disable(gl.BLEND); target(xf.L.fbo);
+  use(progs.xform, { u_src:xf.t, u_doc:[doc.w, doc.h], u_xf:[xf.tx, xf.ty, xf.s], u_lod: Math.max(0, Math.log2(1 / xf.s)) }); drawFull();
+  syncXfUI(); dirty = true;
+}
+// settle (keep the new place, as one step that can be undone) or call it off (put the layer back)
+function xfEnd(keep){
+  const x = xf; if (!x) return;
+  xf = null;   // before pushUndo, which would otherwise settle it again
+  const moved = x.tx !== 0 || x.ty !== 0 || x.s !== 1;
+  if (keep && moved) pushUndo([snapLayer(x.L, 0, 0, doc.w, doc.h, x.f)]);
+  else blit(x.f, x.L.fbo, 0, 0, doc.w, doc.h, 0, 0);
+  freeTF(x.t, x.f);
+  syncXfUI(); renderLayers(); dirty = true;
+}
+function syncXfUI(){
+  $('#xfBar').hidden = $('#xfBox').hidden = !xf;
+  canvas.classList.toggle('xf', !!xf);
+  if (!xf) { canvas.style.cursor = ''; return; }
+  $('#xfName').textContent = `「${xf.L.name}」`; $('#xfPct').textContent = Math.round(xf.s * 100) + '%';
+  placeXfBox();
+}
+// paper → stage pixels, the way the view draws it (offset, zoom, turn)
+function toStage(x, y){ const r = rotV(x * view.z, y * view.z, view.r); return { x: view.x + r.x, y: view.y + r.y }; }
+function xfCorners(){ const b = xf.box, s = xf.s; return [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]].map(([x, y]) => ({ x: xf.tx + x * s, y: xf.ty + y * s })); }
+function placeXfBox(){
+  if (!xf) return;
+  const c = xfCorners(), tl = toStage(c[0].x, c[0].y), el = $('#xfBox');
+  el.style.width = (xf.box.w * xf.s * view.z) + 'px'; el.style.height = (xf.box.h * xf.s * view.z) + 'px';
+  el.style.transform = `translate(${tl.x}px, ${tl.y}px) rotate(${view.r}rad)`;
+}
+function xfCornerAt(e){
+  const reach = e.pointerType === 'mouse' ? 14 : 28, x = e.clientX - stageRect.left, y = e.clientY - stageRect.top;
+  let best = -1, bd = reach;
+  xfCorners().forEach((c, i) => { const p = toStage(c.x, c.y), d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+// scale to s about a fixed paper point: what is under it stays under it
+function xfScaleAbout(s, px, py){
+  s = clamp(s, .05, 8);
+  const qx = (px - xf.tx) / xf.s, qy = (py - xf.ty) / xf.s;
+  xf.s = s; xf.tx = px - s * qx; xf.ty = py - s * qy;
+}
+function xfDown(e){
+  const panning = e.button === 1 || (e.pointerType === 'mouse' && (spaceDown || e.button === 2)) || (spaceDown && e.pointerType !== 'touch') || (e.pointerType === 'pen' && (e.buttons & 2));
+  if (panning) return false;
+  if (e.pointerType === 'mouse' && e.button !== 0) return false;
+  if (e.pointerType === 'touch') {
+    pointers.set(e.pointerId, { x:e.clientX, y:e.clientY }); tap = null;
+    if (pointers.size >= 2) {
+      const [a, b] = [...pointers.values()], c = toDoc((a.x + b.x) / 2, (a.y + b.y) / 2);
+      xf.drag = null; xf.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), s: xf.s, q: { x: (c.x - xf.tx) / xf.s, y: (c.y - xf.ty) / xf.s } };
+      return true;
+    }
+  }
+  const d = toDoc(e.clientX, e.clientY), k = xfCornerAt(e);
+  xf.drag = { id:e.pointerId, d, tx:xf.tx, ty:xf.ty, s:xf.s, corner:k };
+  if (k >= 0) { const c = xfCorners(); xf.drag.anchor = c[(k + 2) % 4]; xf.drag.from = c[k]; }
+  return true;
+}
+function xfMove(e){
+  if (e.pointerType === 'touch' && pointers.has(e.pointerId)) pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if (panDrag) return false;
+  if (xf.pinch && pointers.size >= 2) {
+    const [a, b] = [...pointers.values()], c = toDoc((a.x + b.x) / 2, (a.y + b.y) / 2), g = xf.pinch;
+    xf.s = clamp(g.s * Math.hypot(a.x - b.x, a.y - b.y) / Math.max(1, g.d), .05, 8);
+    xf.tx = c.x - xf.s * g.q.x; xf.ty = c.y - xf.s * g.q.y;   // the spot between the fingers stays between them
+    xfApply(); return true;
+  }
+  const g = xf.drag;
+  if (g && e.pointerId === g.id) {
+    const d = toDoc(e.clientX, e.clientY);
+    if (g.corner >= 0) {
+      // the opposite corner stays put; the size follows how far the dragged corner is from it
+      const A = g.anchor, d0 = Math.hypot(g.from.x - A.x, g.from.y - A.y), d1 = Math.hypot(d.x - A.x, d.y - A.y);
+      xf.tx = g.tx; xf.ty = g.ty; xf.s = g.s;
+      xfScaleAbout(g.s * d1 / Math.max(1, d0), A.x, A.y);
+    } else { xf.tx = g.tx + d.x - g.d.x; xf.ty = g.ty + d.y - g.d.y; }
+    xfApply(); return true;
+  }
+  if (e.pointerType !== 'touch') { const k = xfCornerAt(e); canvas.style.cursor = k < 0 ? '' : (k % 2 ? 'nesw-resize' : 'nwse-resize'); }
+  return true;
+}
+function xfUp(e){
+  if (xf.drag && e.pointerId === xf.drag.id) xf.drag = null;
+  if (e.pointerType === 'touch') { pointers.delete(e.pointerId); if (pointers.size < 2) xf.pinch = null; }
+}
+function xfWheel(e){
+  const d = toDoc(e.clientX, e.clientY), dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+  xfScaleAbout(xf.s * Math.exp(-dy * (e.ctrlKey ? .01 : .0015)), d.x, d.y); xfApply();
+}
+// keys while moving: Enter settles, Esc calls it off, arrows nudge (Shift: 10x) in the direction they point on screen
+window.addEventListener('keydown', e => {
+  if (!xf || (e.target.matches && e.target.matches('input,select,textarea')) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const d = { ArrowLeft:[-1, 0], ArrowRight:[1, 0], ArrowUp:[0, -1], ArrowDown:[0, 1] }[e.key];
+  if (e.key === 'Enter') xfEnd(true);
+  else if (e.key === 'Escape') xfEnd(false);
+  else if (d) { const m = rotV(d[0] * (e.shiftKey ? 10 : 1), d[1] * (e.shiftKey ? 10 : 1), -view.r); xf.tx += m.x / view.z; xf.ty += m.y / view.z; xfApply(); }
+  else return;
+  e.preventDefault(); e.stopImmediatePropagation();
+}, true);
+$('#xfOk').addEventListener('click', () => xfEnd(true));
+$('#xfCancel').addEventListener('click', () => xfEnd(false));
+$('#xfLayer').addEventListener('click', () => { if (xf) xfEnd(true); else xfStart(active); });
 
 window.addEventListener('keydown', e => {
   if (e.target.matches('input,select,textarea')) return;
@@ -2201,6 +2377,7 @@ window.addEventListener('keydown', e => {
   if (k === '+' || k === '=' || k === ';') { zoomStep(1.25); return; }
   if (k === '-') { zoomStep(.8); return; }
   if (k === 'd') { dryNow(); return; }
+  if (k === 'v') { if (xf) xfEnd(true); else xfStart(active); return; }
   for (const t in TOOLS) if (TOOLS[t].key === k) { selectTool(t); return; }
 });
 window.addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; canvas.style.cursor = ''; } });
@@ -2243,7 +2420,7 @@ function frame(now){
     dirty = true; updateWetUI();
   }
   if (++uiTick % 6 === 0 || simSteps <= 0) updateWetUI();
-  if (dirty) { composite(); dirty = false; }
+  if (dirty) { composite(); if (xf) placeXfBox(); dirty = false; }
 }
 let wetShown = null, uiTick = 0;
 let coachQueued = false;
@@ -2293,7 +2470,7 @@ function buildTools(){
     nav.appendChild(b);
   }
 }
-function selectTool(t){ S.tool = t; setHand(false); saveSettings(); syncProps(); }
+function selectTool(t){ if (xf) xfEnd(true); S.tool = t; setHand(false); saveSettings(); syncProps(); }
 let handMode = false;
 function setHand(on){ handMode = on; $('#handBtn').setAttribute('aria-pressed', String(on)); canvas.classList.toggle('hand', on); if (on) cursorEl.style.display = 'none'; }
 function zoomStep(f){ zoomAt(stageRect.width / 2, stageRect.height / 2, f); }
@@ -3200,8 +3377,8 @@ function importImage(bmp, mode, name, lut){
   if (layers.length >= 8) { toast('レイヤーは8枚までです。どれかを消してから読み込んでください'); return; }
   const s = Math.min(doc.w / bmp.width, doc.h / bmp.height), w = Math.max(1, Math.round(bmp.width * s)), h = Math.max(1, Math.round(bmp.height * s));
   const c = document.createElement('canvas'); c.width = doc.w; c.height = doc.h;
-  const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
-  g.drawImage(bmp, Math.round((doc.w - w) / 2), Math.round((doc.h - h) / 2), w, h);
+  const g = c.getContext('2d'), x = Math.round((doc.w - w) / 2), y = Math.round((doc.h - h) / 2); g.imageSmoothingQuality = 'high';
+  g.drawImage(bmp, x, y, w, h);
   const src = g.getImageData(0, 0, doc.w, doc.h).data, out = new Float32Array(src.length), opaque = mode === 'opaque';
   // a see-through pixel first takes the colour it would show over white paper, so soft edges look as they do in any image viewer
   const absOver = (v, a) => -Math.log(Math.max(1 - a * (1 - v / 255), .012));
@@ -3216,6 +3393,7 @@ function importImage(bmp, mode, name, lut){
   gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, doc.w, doc.h, gl.RGBA, gl.FLOAT, out);
   active = L; pushUndo([{ kind:'stack', layer:L, at:layers.indexOf(L), held:false, bytes:0 }]); renderLayers(); dirty = true;
   toast(`「${name}」を新しいレイヤーに読み込みました（元に戻せます）`);
+  return { L, box:{ x, y, w, h } };
 }
 const looksLikeImage = file => /^image\//.test(file.type) || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file.name);
 let imgPick = null;   // { bmp, name, fresh, prev, pw, ph, paper }: fresh = start a new sheet for it (opened from the start screen)
@@ -3280,8 +3458,9 @@ $$('#imgDlg [data-mode]').forEach(b => b.addEventListener('click', () => {
   const p = imgPick; if (!p) return;
   const lut = adjLuts();
   if (p.fresh) $('#startGo').click();   // the paper and size picked on the start screen
-  importImage(p.bmp, b.dataset.mode, p.name, lut);
+  const placed = importImage(p.bmp, b.dataset.mode, p.name, lut);
   closeImgDlg();
+  if (placed) xfStart(placed.L, placed.box);   // straight into moving it: where and how big is the next thing to decide
 }));
 $('#imgCancel').addEventListener('click', closeImgDlg);
 $('#imgDlg').addEventListener('click', e => { if (e.target.id === 'imgDlg') closeImgDlg(); });
