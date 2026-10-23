@@ -93,7 +93,8 @@ button,input,select{font:inherit;color:inherit}
 
 /* stage */
 #stage{grid-row:2;grid-column:2;position:relative;overflow:hidden;background:var(--stage);touch-action:none}
-#view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:none}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#view.nocur{cursor:none}   /* only while the brush circle stands in for it: see sysCursor() */
 #view.xf{cursor:move}
 #xfBox{position:absolute;left:0;top:0;transform-origin:0 0;border:1.5px dashed var(--accent);box-shadow:0 0 0 1px rgba(255,255,255,.55);pointer-events:none;z-index:4;box-sizing:border-box}
 #xfBox i{position:absolute;width:12px;height:12px;margin:-7px 0 0 -7px;background:var(--panel);border:2px solid var(--accent);border-radius:3px;box-sizing:border-box}
@@ -2115,8 +2116,12 @@ function gestureMove(){
   view.z = z; view.x = lx + o.x * k; view.y = ly + o.y * k; view.r = normA(r); if (Math.abs(view.r) < 1e-6) view.r = 0;
   updateZoomUI(); updateRotUI(); dirty = true;
 }
+// The system cursor is hidden only while the brush circle is shown in its place, and never while the page is not in front.
+// A file picker that opens while the cursor is hidden keeps it hidden on Windows (seen with both mouse and pen).
+function sysCursor(hide){ canvas.classList.toggle('nocur', hide); if (!hide) cursorEl.style.display = 'none'; }
 function showCursor(ev){
-  if (ev.pointerType === 'touch' || panDrag || spaceDown || handMode) { cursorEl.style.display = 'none'; return; }
+  if (ev.pointerType === 'touch' || panDrag || spaceDown || handMode) { sysCursor(false); return; }
+  canvas.classList.add('nocur');
   const tool = (ev.pointerType === 'pen' && (ev.buttons & 32)) ? 'eraser' : S.tool;
   const r = Math.max(1.5, (S.tools[tool].size / 2) * view.z * (tool === 'gpen' ? .6 : tool === 'fpen' ? .8 : 1));
   const x = ev.clientX - stageRect.left, y = ev.clientY - stageRect.top;
@@ -2155,7 +2160,7 @@ canvas.addEventListener('pointerdown', e => {
   // pan: hand tool, space, wheel button, right button, or the pen's side button
   if (e.button === 1 || (e.pointerType === 'mouse' && (spaceDown || e.button === 2)) || ((handMode || spaceDown) && e.pointerType !== 'touch') || (e.pointerType === 'pen' && (e.buttons & 2))) {
     canvas.classList.add('grabbing');
-    panDrag = { x:e.clientX, y:e.clientY, vx:view.x, vy:view.y, id:e.pointerId }; cursorEl.style.display = 'none'; return;
+    panDrag = { x:e.clientX, y:e.clientY, vx:view.x, vy:view.y, id:e.pointerId }; sysCursor(false); return;
   }
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   if (stroke) return;
@@ -2213,7 +2218,8 @@ function pointerEnd(e){
 }
 canvas.addEventListener('pointerup', pointerEnd);
 canvas.addEventListener('pointercancel', e => { if (stroke && e.pointerId === stroke.pid && e.pointerType === 'touch') { pointers.delete(e.pointerId); endStroke(); return; } pointerEnd(e); });
-canvas.addEventListener('pointerleave', e => { if (!stroke) cursorEl.style.display = 'none'; });
+canvas.addEventListener('pointerleave', e => { if (!stroke) sysCursor(false); });
+window.addEventListener('blur', () => sysCursor(false));   // a file picker or another window comes to the front
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
@@ -2255,7 +2261,7 @@ function xfStart(L, box){
   setHand(false);
   xf = { L, t, f, box, tx:0, ty:0, s:1, drag:null, pinch:null };
   if (isNarrow()) { ['props', 'layers', 'settings'].forEach(k => $('#' + k).hidden = true); syncPanelBtns(); }
-  cursorEl.style.display = 'none';
+  sysCursor(false);
   syncXfUI(); dirty = true;
 }
 function xfApply(){
@@ -2472,7 +2478,7 @@ function buildTools(){
 }
 function selectTool(t){ if (xf) xfEnd(true); S.tool = t; setHand(false); saveSettings(); syncProps(); }
 let handMode = false;
-function setHand(on){ handMode = on; $('#handBtn').setAttribute('aria-pressed', String(on)); canvas.classList.toggle('hand', on); if (on) cursorEl.style.display = 'none'; }
+function setHand(on){ handMode = on; $('#handBtn').setAttribute('aria-pressed', String(on)); canvas.classList.toggle('hand', on); if (on) sysCursor(false); }
 function zoomStep(f){ zoomAt(stageRect.width / 2, stageRect.height / 2, f); }
 function syncProps(){
   const t = S.tool, T = TOOLS[t], ts = S.tools[t];
@@ -3465,10 +3471,10 @@ $$('#imgDlg [data-mode]').forEach(b => b.addEventListener('click', () => {
 $('#imgCancel').addEventListener('click', closeImgDlg);
 $('#imgDlg').addEventListener('click', e => { if (e.target.id === 'imgDlg') closeImgDlg(); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#imgDlg').hidden) closeImgDlg(); });
-$('#imgLayer').addEventListener('click', () => { if (stroke) return; $('#imgFile').value = ''; $('#imgFile').click(); });
+$('#imgLayer').addEventListener('click', () => { if (stroke) return; sysCursor(false); $('#imgFile').value = ''; $('#imgFile').click(); });
 $('#imgFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) pickImage(f, false); });
 // the start screen opens either kind of file; no type filter on the picker, since phones would grey out .nijimi
-$$('[data-open]').forEach(b => b.addEventListener('click', () => { $('#openFile').value = ''; $('#openFile').click(); }));
+$$('[data-open]').forEach(b => b.addEventListener('click', () => { sysCursor(false); $('#openFile').value = ''; $('#openFile').click(); }));
 $('#openFile').addEventListener('change', async e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   if (await isNijimi(f)) openNijimiFile(f);
