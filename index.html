@@ -394,7 +394,7 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 #layerList .mv button:hover{background:var(--active);color:var(--ink)}
 #layerList .mv button:disabled{opacity:.25;cursor:default}
 
-#toast{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:20;background:var(--ink);color:var(--chrome);padding:8px 14px;border-radius:8px;font-size:12.5px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:min(92%,460px);text-align:center;line-height:1.5}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--chrome);padding:8px 14px;border-radius:8px;font-size:12.5px;opacity:0;transition:opacity .25s;pointer-events:none;width:max-content;max-width:min(calc(100vw - 32px),460px);box-sizing:border-box;text-align:center;line-height:1.5}
 #toast.show{opacity:1}
 #modal,#imgDlg{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-left,0px))}
 #modal .sheet,#imgDlg .sheet{overflow-y:auto;background:var(--panel);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;max-width:min(900px,100%);max-height:100%;box-sizing:border-box}
@@ -484,6 +484,10 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 .nhead .ntitle svg{width:22px;height:22px;color:var(--accent);flex:none}
 #noteBack{gap:2px;padding:0 10px 0 6px;font-size:12.5px}
 #noteBack svg{width:16px;height:16px}
+.release-note{padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--panel);line-height:1.7}
+.release-note h2{margin:0 0 8px;font-size:17px}
+.release-note ul{padding-left:1.4em;margin:8px 0 12px}
+.release-note a,.nbody a{color:var(--accent);text-underline-offset:3px}
 .ntabs{display:flex;gap:5px;padding:2px 12px 10px max(12px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;flex:none}
 .ntabs::-webkit-scrollbar{display:none}
 .ntabs button{flex:1 0 auto;height:32px;padding:0 11px;border:1px solid var(--line);border-radius:16px;background:var(--panel);cursor:pointer;font-size:12.5px;color:var(--muted)}
@@ -773,6 +777,11 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
 <div id="start" hidden>
   <div class="startcard" role="dialog" aria-modal="true" aria-labelledby="stTitle">
     <div class="sthead"><h1 id="stTitle"><span class="mark" aria-hidden="true"></span>にじみ帖</h1><button class="btn icon" id="startClose" title="閉じる" aria-label="閉じる" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <section id="releaseNotice" class="release-note" aria-labelledby="releaseTitle" hidden>
+      <h2 id="releaseTitle">バージョンアップしました！</h2>
+      <div id="releaseSummary"></div>
+      <button class="btn" id="releaseDismiss">確認しました</button>
+    </section>
     <div class="install" data-where="start" hidden>
       <p><b>ホーム画面に追加しませんか</b><span class="hint">アプリのように全画面で開けて、オフラインでも使えます。作品もブラウザに消されにくくなります。</span><span class="hint ios">Safari の共有ボタン（□に↑）→「ホーム画面に追加」で追加できます。</span></p>
       <div class="iacts"><button class="btn primary" data-install>追加する</button><button class="more" data-dismiss>今はしない</button></div>
@@ -2720,7 +2729,7 @@ function dryNow(){
 
 /* ================= UI ================= */
 let toastT = 0;
-function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function toast(msg, ms = 2600){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
 
 function buildTools(){
   const nav = $('#tools');
@@ -3357,8 +3366,11 @@ function syncDownloadUI(){
     ? '<b style="color:var(--ink)">画像を長押し</b>して保存してください（PCは右クリック →「名前を付けて画像を保存」）。この画面ではダウンロードボタンが使えません。'
     : 'ダウンロードできない環境では、画像を右クリック（スマホは長押し）して保存してください。';
 }
+// the browser saves the plain link on its own and, on phones, often says nothing in the page: tell the user where it went
+const DL_WHERE = '見つからないときは、ブラウザのダウンロード一覧を見てください';
 $('#dlLink').addEventListener('click', e => {
-  if (!dlNS || !lastBlob) return;
+  if (!lastBlob) return;
+  if (!dlNS) { toast(`PNGをダウンロードしました。${DL_WHERE}`, 4500); return; }
   e.preventDefault();
   dlNS.save({ filename: $('#dlLink').download, data: lastBlob }).then(() => toast('保存しました')).catch(err => {
     if (err && err.code === 'declined') return;
@@ -3835,7 +3847,7 @@ $('#njSave').addEventListener('click', async () => {
     }
     keptSeq = seq; markChanged(false);   // the device save remembers the name too
     $('#njInfo').textContent = `「${name}」を保存しました（${fmtSize(blob.size)}）`;
-    toast(`.nijimi で保存しました（${fmtSize(blob.size)}）`);
+    toast(`.nijimi で保存しました（${fmtSize(blob.size)}）${dlNS ? '' : '。' + DL_WHERE}`, dlNS ? 2600 : 4500);
   } catch (err) {
     if (err && err.code === 'declined') return;
     console.error(err);
@@ -4391,7 +4403,7 @@ const LAYER_ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const PAPER_ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>';
 const WHEN = { wet:'濡れているうち', damp:'半乾きのとき', dry:'乾いてから' };
 
-const NOTE_TABS = [['dry', '乾き'], ['tech', '技法'], ['tools', '画材'], ['paper', '紙'], ['words', 'ことば']];
+const NOTE_TABS = [['dry', '乾き'], ['tech', '技法'], ['tools', '画材'], ['paper', '紙'], ['words', 'ことば'], ['about', 'このアプリ']];
 
 const TECH = {
   wet:{ name:'にじみ', alias:'ウェット・イン・ウェット', when:'wet', card:'濡らした紙に色を落として、ふんわり広げる',
@@ -4625,6 +4637,40 @@ function pagePaper(){
       ${useChips([{ paper:k }])}</section>`;
   }).join('');
 }
+// Change this ID and the summary together for the next release.
+const APP_RELEASE = '2026.10.23';
+const REPO_URL = 'https://github.com/omochi7777/nijimisuisai';
+function releaseSummary(){
+  return `<p class="hint">${APP_RELEASE} 更新</p>
+    <ul><li>画像の読み込み、複数作品の保存、レイヤー情報などを保存できる .nijimi 保存に対応しました。</li>
+    <li>絵の拡大・縮小や紙の追加・切り取りができるようになりました。</li>
+    <li>紙の色と紙目の表示を作品ごとに選べるようになりました。</li>
+    <li>スポイトで、絵から色を取れるようになりました。</li></ul>`;
+}
+function appLinks(){
+  return `<p><a href="${REPO_URL}#readme" target="_blank" rel="noopener noreferrer">使い方を読む（README） ↗</a></p>
+    <p class="hint">外部ページが新しいタブで開きます。インターネット接続が必要です。</p>`;
+}
+function pageAbout(){
+  return `<h2 class="nh">にじみ帖について</h2><p>ブラウザで描ける、水彩・インク・鉛筆のお絵かきアプリです。</p>
+    <h3>使い方</h3><p>道具の使い方、画像の読み込み、作品の保存などはREADMEにまとめています。</p>${appLinks()}
+    <h3>今回の更新</h3>${releaseSummary()}
+    <h3>GitHub・ライセンス</h3>
+    <p><a href="${REPO_URL}" target="_blank" rel="noopener noreferrer">GitHubでソースコードを見る ↗</a></p>
+    <p>このアプリのソースコードは MIT License で公開しています。© 2026 omochi7777</p>
+    <p>利用・改変・再配布・商用利用ができます。再配布時は著作権表示とライセンス文面を残してください。ソフトウェアは無保証です。</p>
+    <p><a href="${REPO_URL}/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">ライセンス全文を読む ↗</a></p>
+    <p class="hint">画面のフォントは Google Fonts の Zen Maru Gothic と Klee One（SIL Open Font License 1.1）を使用しています。</p>`;
+}
+function buildReleaseNotice(){
+  const notice = $('#releaseNotice');
+  $('#releaseSummary').innerHTML = releaseSummary() + appLinks() + '<p class="hint">この案内は「ノート → このアプリ」からいつでも読めます。</p>';
+  notice.hidden = store.get('releaseSeen', '') === APP_RELEASE;
+  $('#releaseDismiss').addEventListener('click', () => {
+    store.set('releaseSeen', APP_RELEASE); notice.hidden = true;
+    $('#stTitle').tabIndex = -1; $('#stTitle').focus({preventScroll:true});
+  });
+}
 function pageWords(){
   const go = t => t ? `<br><button class="nlink" data-goto="${t}">${t.startsWith('tech:') ? '技法「' + TECH[t.slice(5)].name + '」' : t === 'dry' ? '乾きのページ' : t.startsWith('paper:') ? '紙のページ' : '画材のページ'}を見る</button>` : '';
   return `<dl class="nwords">${WORDS.map(([w, r, d, t]) => `<dt id="nt-word-${w}">${w}${r ? `<small>${r}</small>` : ''}</dt><dd>${d}${go(t)}</dd>`).join('')}</dl>
@@ -4638,7 +4684,7 @@ function renderNote(focusId){
   $('#noteBack').hidden = !(v.tab === 'tech' && v.tech);
   $('#noteTitleText').textContent = '技法ノート';
   body.innerHTML = v.tab === 'dry' ? pageDry() : v.tab === 'tech' ? (v.tech ? pageTech(v.tech) : pageTechList())
-    : v.tab === 'tools' ? pageTools() : v.tab === 'paper' ? pagePaper() : pageWords();
+    : v.tab === 'tools' ? pageTools() : v.tab === 'paper' ? pagePaper() : v.tab === 'about' ? pageAbout() : pageWords();
   // the "use" chips belong to whatever page is showing
   const lists = v.tab === 'tech' && v.tech ? [TECH[v.tech].use] : null;
   body.querySelectorAll('.nuse').forEach((box, bi) => {
@@ -4703,7 +4749,7 @@ function buildNote(){
 }
 
 /* ================= boot ================= */
-buildTools(); buildProps(); buildSettings(); buildNote();
+buildTools(); buildProps(); buildSettings(); buildNote(); buildReleaseNotice();
 if (isNarrow()) { $('#props').hidden = true; $('#layers').hidden = true; }
 syncPanelBtns(); syncProps();
 readStageBg();
