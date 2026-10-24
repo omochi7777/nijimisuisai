@@ -711,12 +711,13 @@ select{height:30px;border:1px solid var(--line);border-radius:7px;background:var
     <section id="layers" class="panel" aria-label="レイヤー">
       <div class="ph"><span class="ptitle">レイヤー<button class="qbtn" aria-expanded="false" aria-controls="layersHint" title="説明を見る" aria-label="説明を見る">?</button></span><span style="display:flex;gap:6px"><button class="btn" id="addLayer" title="レイヤーを追加">＋ 追加</button><button class="btn icon mclose" data-close title="閉じる" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span></div>
       <ul id="layerList"></ul>
+      <button class="btn" id="mergeDown" title="選択中のレイヤーを、すぐ下のレイヤーと1枚にまとめる">下のレイヤーと結合</button>
       <button class="btn" id="clearLayer">選択中のレイヤーを白紙に戻す</button>
       <div class="lyacts">
         <button class="btn" id="imgLayer" title="PNG・JPGなどの画像を新しいレイヤーとして読み込む">画像を読み込む</button>
         <button class="btn" id="xfLayer" title="選択中のレイヤーを動かす・大きさを変える (V)">移動・拡大</button>
       </div>
-      <p class="hint" id="layersHint" hidden>水彩・鉛筆・インクは透明で、重ねると下の色と混ざって深くなります（減法混色）。ガッシュは不透明なので、上のレイヤーほど手前に来ます。<span style="color:var(--wet)">●</span> は濡れた絵の具が乗っているレイヤーです。</p>
+      <p class="hint" id="layersHint" hidden>水彩・鉛筆・インクは透明で、重ねると下の色と混ざって深くなります（減法混色）。ガッシュは不透明なので、上のレイヤーほど手前に来ます。<span style="color:var(--wet)">●</span> は濡れた絵の具が乗っているレイヤーです。レイヤーは8枚までです。「下のレイヤーと結合」で、選択中のレイヤーをすぐ下のレイヤーと1枚にまとめられます。</p>
     </section>
 
     <section id="tilt" class="panel" aria-label="紙の傾き" hidden>
@@ -1180,6 +1181,19 @@ const FS_SUM = HEAD + `
 uniform sampler2D u_P, u_D;
 out vec4 o;
 void main(){ ivec2 c = ivec2(gl_FragCoord.xy); o = texelFetch(u_D, c, 0) + texelFetch(u_P, c, 0); }`;
+// two layers into one, as the paper shows them: each with its opacity baked in, the upper one's gouache white over the lower one's paint.
+// A layer shows as mix(below, white, a) * exp(-A); the pair's exp(-A) comes out exact, its one coverage a is the mean over the three colours
+const FS_MERGE = HEAD + `
+uniform sampler2D u_lo, u_up; uniform float u_opLo, u_opUp;
+out vec4 o;
+void main(){
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  vec4 lo = texelFetch(u_lo, c, 0) * u_opLo, up = texelFetch(u_up, c, 0) * u_opUp;
+  float aL = clamp(lo.a, 0., 1.), aU = clamp(up.a, 0., 1.);
+  vec3 eL = exp(-lo.rgb), k = (1. - aU) * eL + aU;
+  vec3 a = ((1. - aU) * aL * eL + aU) / max(k, 1e-30);
+  o = vec4(up.rgb - log(max(k, 1e-30)), dot(a, vec3(1./3.)));
+}`;
 const FS_REDUCE = HEAD + `
 uniform sampler2D u_W; uniform ivec2 u_block;
 out vec4 o;
@@ -1453,7 +1467,7 @@ try {
     paper: program(VS_FULL, FS_PAPER), flux: program(VS_FULL, FS_FLUX), update: program(VS_FULL, FS_UPDATE),
     finalize: program(VS_FULL, FS_FINALIZE), bake: program(VS_FULL, FS_BAKE), comp: program(VS_FULL, FS_COMP),
     brush: program(VS_DAB, FS_BRUSH), simErase: program(VS_DAB, FS_SIMERASE), layerErase: program(VS_DAB, FS_LAYERERASE),
-    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM), resample: program(VS_FULL, FS_RESAMPLE),
+    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM), merge: program(VS_FULL, FS_MERGE), resample: program(VS_FULL, FS_RESAMPLE),
   };
 } catch (err) { fatal('シェーダーの準備に失敗しました: ' + err.message); console.error(err); return; }
 
@@ -1748,6 +1762,27 @@ function putLayer(L, at){
   layers.splice(Math.min(at, layers.length), 0, L); active = L;
   return { kind:'stack', layer:L, at, held:false, bytes:0 };
 }
+// the selected layer goes into the one below it, which keeps its name and shows at full opacity (the opacities are baked into the paint).
+// Wet paint on either is dried first, all in one step of the history: the lower layer's old texture and the upper layer stay there
+function mergeDown(){
+  if (stroke) return;
+  const up = active, i = layers.indexOf(up), lo = layers[i - 1];
+  if (!lo) { toast('いちばん下のレイヤーには、結合する下のレイヤーがありません'); return; }
+  if (!up.visible || !lo.visible) { toast('非表示のレイヤーは結合できません。表示してから結合してください'); return; }
+  if (xf) xfEnd(true);
+  flushDabs();
+  const parts = [], wet = simHasContent && (simOwner === up || simOwner === lo) ? simOwner : null;
+  if (wet) { parts.push(snapLayer(wet, 0, 0, doc.w, doc.h), snapSim()); bakeSim(false); }
+  const t = mkTex(doc.w, doc.h), f = mkFbo([t]);
+  gl.disable(gl.BLEND); target(f);
+  use(progs.merge, { u_lo:lo.tex, u_up:up.tex, u_opLo:lo.opacity, u_opUp:up.opacity }); drawFull(); target(null);
+  parts.push({ kind:'layer', layer:lo, x:0, y:0, w:doc.w, h:doc.h, t:lo.tex, f:lo.fbo, bytes:doc.w * doc.h * 8 });
+  lo.tex = t; lo.fbo = f;
+  parts.push({ kind:'props', layer:lo, opacity:lo.opacity, bytes:0 }); lo.opacity = 1;
+  parts.push(takeLayer(up)); active = lo;
+  pushUndo(parts); renderLayers(); dirty = true;
+  toast(`「${up.name}」を「${lo.name}」に結合しました（元に戻せます）${wet ? '。濡れた絵の具は乾かして定着させました' : ''}`, wet ? 4500 : 2600);
+}
 
 /* ================= simulation ================= */
 function clearSim(){ for (let i = 0; i < 2; i++) { clearF(simFbo[i]); clearF(fF[i]); } simHasContent = false; simSteps = 0; simBoost = 1; tips.length = 0; }
@@ -1804,6 +1839,7 @@ function freePart(p){
   if (p.kind === 'layer') freeTF(p.t, p.f);
   else if (p.kind === 'sheet') p.texs.forEach(e => freeTF(e.t, e.f));   // the sheets of the other size, held only by the history
   else if (p.kind === 'stack') { if (p.held) freeTF(p.layer.tex, p.layer.fbo); }   // a layer still in the document is not the history's to free
+  else if (p.kind === 'props') return;
   else p.tex.forEach((t, i) => freeTF(t, p.fbo[i]));
 }
 function freeEntry(e){ e.parts.forEach(freePart); undoBytes -= e.bytes; }
@@ -1820,6 +1856,7 @@ function pushUndo(parts){
 function restorePart(p){
   if (p.kind === 'stack') return p.held ? putLayer(p.layer, p.at) : takeLayer(p.layer);
   if (p.kind === 'sheet') return swapSheet(p);
+  if (p.kind === 'props') { const cur = { ...p, opacity:p.layer.opacity }; p.layer.opacity = p.opacity; return cur; }
   if (p.kind === 'layer') {
     const cur = snapLayer(p.layer, p.x, p.y, p.w, p.h);
     blit(p.f, p.layer.fbo, 0, 0, p.w, p.h, p.x, p.y); freePart(p); return cur;
@@ -3231,6 +3268,7 @@ function renderLayers(){
     li.querySelector('.up').disabled = idx === layers.length - 1; li.querySelector('.dn').disabled = idx === 0;
   });
   $('#addLayer').disabled = layers.length >= 8;
+  $('#mergeDown').disabled = layers.indexOf(active) < 1;
 }
 function syncPanelBtns(){
   $('#layBtn').setAttribute('aria-pressed', !$('#layers').hidden); $('#setBtn').setAttribute('aria-pressed', !$('#settings').hidden); $('#tiltBtn').setAttribute('aria-pressed', !$('#tilt').hidden);
@@ -3289,6 +3327,7 @@ $('#addLayer').addEventListener('click', () => {
   const L = addLayer(); if (!L) return;
   active = L; pushUndo([{ kind:'stack', layer:L, at:layers.indexOf(L), held:false, bytes:0 }]); renderLayers();
 });
+$('#mergeDown').addEventListener('click', mergeDown);
 $('#clearLayer').addEventListener('click', () => {
   if (stroke) return;
   const parts = [snapLayer(active, 0, 0, doc.w, doc.h)];
