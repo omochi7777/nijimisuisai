@@ -4640,10 +4640,10 @@ function pagePaper(){
   }).join('');
 }
 // Change this ID and the summary together for the next release.
-const APP_RELEASE = '2026.10.23';
+const APP_RELEASE = 'v0.2.0', APP_RELEASE_DATE = '2026年10月24日';
 const REPO_URL = 'https://github.com/omochi7777/nijimisuisai';
 function releaseSummary(){
-  return `<p class="hint">${APP_RELEASE} 更新</p>
+  return `<p class="hint">にじみ帖 ${APP_RELEASE}（${APP_RELEASE_DATE}）</p>
     <ul><li>画像の読み込み、複数作品の保存、レイヤー情報などを保存できる .nijimi 保存に対応しました。</li>
     <li>絵の拡大・縮小や紙の追加・切り取りができるようになりました。</li>
     <li>紙の色と紙目の表示を作品ごとに選べるようになりました。</li>
