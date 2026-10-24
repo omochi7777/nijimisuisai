@@ -3980,6 +3980,8 @@ $$('[data-open]').forEach(b => b.addEventListener('click', () => { sysCursor(fal
 $('#openFile').addEventListener('change', async e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   if (await isNijimi(f)) openNijimiFile(f);
+  // phones can hand over a file the browser is still writing (just saved, or picked from "recent"): it comes empty or without its start
+  else if (!f.size || /\.nijimi$/i.test(f.name)) toast('ファイルをまだ読み込めませんでした。保存した直後なら、少し待ってからもう一度開いてください', 4500);
   else if (looksLikeImage(f)) pickImage(f, true);
   else toast('開けるのは、にじみ帖のファイル（.nijimi）と画像（PNG・JPG など）です');
 });
