@@ -1085,7 +1085,16 @@ layout(location=0) out vec4 oW; layout(location=1) out vec4 oP; layout(location=
 void main(){
   SZ = textureSize(u_W, 0);
   ivec2 c = ivec2(gl_FragCoord.xy);
-  vec4 W = texelFetch(u_W,c,0), F = texelFetch(u_F,c,0), P = texelFetch(u_P,c,0), D = texelFetch(u_D,c,0);
+  vec4 W = texelFetch(u_W,c,0), P = texelFetch(u_P,c,0), D = texelFetch(u_D,c,0);
+  // most of the sheet is dry paper with nothing moving into it: it stays exactly as it is.
+  // Water only flows out of cells that hold some, and dry paper (s = 0) only draws damp in where u_delta is 0 (washi)
+  if(W.r < 1e-4 && W.g <= 0. && P == vec4(0)){
+    bool quiet = true;
+    ivec2 nb[4] = ivec2[4](ivec2(-1,0), ivec2(1,0), ivec2(0,-1), ivec2(0,1));
+    for(int i=0;i<4;i++){ ivec2 q = c + nb[i]; if(!inside(q)) continue; vec4 Wq = texelFetch(u_W,q,0); if(Wq.r >= 1e-4 || (u_delta <= 0. && Wq.g > 0.)) { quiet = false; break; } }
+    if(quiet){ oW = vec4(0); oP = vec4(0); oD = D; return; }
+  }
+  vec4 F = texelFetch(u_F,c,0);
   float h = W.r, s = W.g;
   float outF = F.x + F.y + F.z + F.w;
   float hn = h - outF;
