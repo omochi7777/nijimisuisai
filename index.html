@@ -2065,7 +2065,7 @@ function beginStroke(e, pt){
   if (layerSnap) blit(active.fbo, backupF, 0, 0, doc.w, doc.h, 0, 0);
   qInfo = streamInfo(tool);
   if (toolUsesColor(tool, S.grade)) rememberColor();
-  if (WET.includes(tool) && tool !== 'water' && S.vein > 0) readWetMap();
+  if (WET.includes(tool) && tool !== 'water' && S.vein > 0) freshWetMap(500);
   stroke = { pid:e.pointerId, ptype:e.pointerType, tool, parts, layerSnap, layer:active, seed:qInfo.seed,
     bbox:[1e9, 1e9, -1e9, -1e9], last:pt, sm:{ x:pt.x, y:pt.y }, carry:0, res:1, dist:0, t0:performance.now(), lastDabT:performance.now(),
     dir:[1, 0], pSm:pt.p, idle:0, eraseSim: coversSim, holdT:performance.now(), holdAt:{ x:e.clientX, y:e.clientY }, bleedT:0, bleedN:0 };
@@ -2102,7 +2102,7 @@ function emitDab(pt, stationary){
     st.res = Math.max(.02, st.res - sp * (.3 + .7 * p) * Math.sqrt(r / 14) * scr / cap);
   }
   pushDab(pt.x, pt.y, r, stationary ? p * .55 : p, bx, by, st.res, k);
-  if (tool === 'drop') { readWetMap(); spawnTendrils(pt.x, pt.y, r, 0, Math.PI * 2, Math.round(7 + r / 3), 1); }
+  if (tool === 'drop') { freshWetMap(400); spawnTendrils(pt.x, pt.y, r, 0, Math.PI * 2, Math.round(7 + r / 3), 1); }
   else if ((tool === 'brush' || tool === 'flat' || tool === 'sumi') && !stationary && S.vein > 0 && Math.random() < .07 * S.vein / 100 * (sp / Math.max(1, r * .18))) {
     // wet-in-wet: now and then the new paint escapes sideways into the wet wash
     const side = Math.random() < .5 ? 1 : -1, a0 = Math.atan2(st.dir[1], st.dir[0]) + side * Math.PI / 2;
@@ -2263,17 +2263,55 @@ function flushDabs(){
 const tips = [];
 let wetMap = null;
 const MAXTIPS = 500;
-function readWetMap(){
-  const mw = Math.max(8, Math.round(sim.w / 2)), mh = Math.max(8, Math.round(sim.h / 2));
+// where the paper is wet, on the CPU, for the threads of ink: a third of the paper's size is plenty for them.
+// Read back without waiting for the GPU (a frame or two late), every quarter second while threads grow or wet tools paint;
+// only a map that is missing or old is read on the spot. While threads are growing, paper that was wet stays wet in the map
+// (a thin film soaks in within a second, and the threads would stop short); with none growing, the map is just the paper now
+function wetMapSize(){ return [Math.max(8, Math.round(doc.w / 3)), Math.max(8, Math.round(doc.h / 3))]; }
+function drawWetMap(){
+  const [mw, mh] = wetMapSize();
   if (!wetMap || wetMap.w !== mw || wetMap.h !== mh) {
-    if (wetMap) freeTF(wetMap.t, wetMap.f);
+    if (wetMap) { freeTF(wetMap.t, wetMap.f); gl.deleteBuffer(wetMap.pbo); }
     const t = mkTex(mw, mh, 'u8'), f = mkFbo([t]);
-    wetMap = { w:mw, h:mh, t, f, data:new Uint8Array(mw * mh * 4) };
+    wetMap = { w:mw, h:mh, t, f, data:new Uint8Array(mw * mh * 4), tmp:new Uint8Array(mw * mh * 4), pbo:gl.createBuffer(), time:0 };
   }
   gl.disable(gl.BLEND); target(wetMap.f);
   use(progs.wetmap, { u_W:W[si], u_size:[mw, mh] }); drawFull();
-  gl.readPixels(0, 0, mw, mh, gl.RGBA, gl.UNSIGNED_BYTE, wetMap.data);
-  target(null); wetMap.time = performance.now();
+}
+function readWetMap(){
+  drawWetMap();
+  gl.readPixels(0, 0, wetMap.w, wetMap.h, gl.RGBA, gl.UNSIGNED_BYTE, wetMap.tmp);
+  target(null); takeWetMap(wetMap, performance.now());
+}
+function takeWetMap(m, t){
+  if (tips.length) { const a = m.data, b = m.tmp; for (let i = 0; i < a.length; i += 4) { if (b[i] > a[i]) a[i] = b[i]; if (b[i + 1] > a[i + 1]) a[i + 1] = b[i + 1]; } }
+  else { const d = m.data; m.data = m.tmp; m.tmp = d; }
+  m.time = t;
+}
+let wetReq = null, wetAsked = 0;
+function requestWetMap(){
+  if (wetReq) return;
+  drawWetMap(); const m = wetMap;
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, m.pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, m.data.byteLength, gl.STREAM_READ);
+  gl.readPixels(0, 0, m.w, m.h, gl.RGBA, gl.UNSIGNED_BYTE, 0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  target(null);
+  wetReq = { sync: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0), m, t: performance.now() }; wetAsked = wetReq.t;
+  gl.flush();
+}
+function pollWetMap(){
+  if (!wetReq) return;
+  const st = gl.clientWaitSync(wetReq.sync, 0, 0);
+  if (st === gl.TIMEOUT_EXPIRED) return;
+  const r = wetReq; gl.deleteSync(r.sync); wetReq = null;
+  if (st === gl.WAIT_FAILED || r.m !== wetMap) return;   // the sheet changed size meanwhile
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, r.m.pbo); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, r.m.tmp); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  takeWetMap(r.m, r.t);
+}
+// a map no older than maxAge ms now; a fresher one on its way either way
+function freshWetMap(maxAge){
+  const [mw, mh] = wetMapSize();
+  if (!wetMap || wetMap.w !== mw || wetMap.h !== mh || performance.now() - wetMap.time > maxAge) readWetMap();
+  else requestWetMap();
 }
 function wetAt(x, y){
   if (!wetMap) return 0;
@@ -2384,7 +2422,7 @@ function fpenBleed(st, held){
   gl.disable(gl.BLEND); gl.bindVertexArray(null);
   simHasContent = true; wake(); dirty = true;
   // now and then a fine hair of ink runs on from the tip of the tail
-  if (st.bleedN++ % 3 === 0) { readWetMap(); const tx = pt.x - ux * (len - rb * .2), ty = pt.y - uy * (len - rb * .2); spawnTendrils(tx, ty, 2, Math.atan2(-uy, -ux), .5, 1, .3 + .3 * grow); }
+  if (st.bleedN++ % 3 === 0) { freshWetMap(400); const tx = pt.x - ux * (len - rb * .2), ty = pt.y - uy * (len - rb * .2); spawnTendrils(tx, ty, 2, Math.atan2(-uy, -ux), .5, 1, .3 + .3 * grow); }
   if (st.bleedN === 1) renderLayers();
 }
 
@@ -2842,7 +2880,9 @@ function frame(now){
     emitDab({ x:stroke.last.x, y:stroke.last.y, p:stroke.pSm, tx:0, ty:0 }, true);
   }
   flushDabs();
-  pollFit();
+  pollFit(); pollWetMap();
+  // threads of ink follow the wet paper as it is now, not as it was when the stroke began
+  if (S.vein > 0 && (tips.length || (stroke && (WET.includes(stroke.tool) || stroke.bleedN))) && performance.now() - wetAsked > 250) requestWetMap();
   let ran = 0;
   for (let i = 0; i < ticks; i++) {
     if (++tickN % 2 === 0) stepTendrils();   // threads of ink grow at half the step rate
