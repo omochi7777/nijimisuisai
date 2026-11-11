@@ -1704,7 +1704,7 @@ function dryStepsFull(){ const p = simParams(); return Math.ceil(1.3 / p.evap + 
 // are apart, so the sheet can change size under them (resizing the paper, and undoing that)
 function freeSheet(){
   for (let i = 0; i < 2; i++) { [W, P, D, F].forEach(a => a[i] && gl.deleteTexture(a[i])); [simFbo, fW, fP, fD, fF].forEach(a => a[i] && gl.deleteFramebuffer(a[i])); }
-  freeTF(paperTex, paperFbo); freeTF(scratch, scratchF); freeTF(backup, backupF);
+  freeTF(paperTex, paperFbo); freeTF(scratch, scratchF); freeTF(backup, backupF); drainPool();
 }
 function allocSheet(w, h, q, seed, off){
   doc = { w, h }; simQ = q; sim = { w:Math.round(w * q), h:Math.round(h * q) };
@@ -1932,9 +1932,17 @@ function snapLayer(L, x, y, w, h, src){
   const t = mkTex(w, h), f = mkFbo([t]); blit(src || L.fbo, f, x, y, w, h, 0, 0);
   return { kind:'layer', layer:L, x, y, w, h, t, f, bytes:w * h * 8 };
 }
+// The simulation as it is, for the history. Only what holds something is copied: nothing for an empty one, and for a dry one
+// only the settled paint (water and moving paint are all 0 once it has dried: finalizeDry). Textures come from a small pool,
+// so a stroke does not have to wait for new graphics memory
+const simPool = [];
+function poolTex(){ let e; while ((e = simPool.pop())) { if (e.t.w === sim.w && e.t.h === sim.h) return e; freeTF(e.t, e.f); } const t = mkTex(sim.w, sim.h); return { t, f: mkFbo([t]) }; }
+function unpoolTex(t, f){ if (simPool.length < 3 && t.w === sim.w && t.h === sim.h) simPool.push({ t, f }); else freeTF(t, f); }
+function drainPool(){ while (simPool.length) { const e = simPool.pop(); freeTF(e.t, e.f); } }
 function snapSim(){
-  const s = { kind:'sim', owner:simOwner, has:simHasContent, wet:simSteps > 0, tex:[], fbo:[], bytes:sim.w * sim.h * 24 };
-  [fW, fP, fD].forEach(arr => { const t = mkTex(sim.w, sim.h), f = mkFbo([t]); blit(arr[si], f, 0, 0, sim.w, sim.h, 0, 0); s.tex.push(t); s.fbo.push(f); });
+  const keep = !simHasContent ? [] : simSteps > 0 ? [0, 1, 2] : [2];
+  const s = { kind:'sim', owner:simOwner, has:simHasContent, wet:simSteps > 0, tex:[null, null, null], fbo:[null, null, null], bytes:sim.w * sim.h * 8 * keep.length };
+  for (const i of keep) { const e = poolTex(); blit([fW, fP, fD][i][si], e.f, 0, 0, sim.w, sim.h, 0, 0); s.tex[i] = e.t; s.fbo[i] = e.f; }
   return s;
 }
 function freePart(p){
@@ -1942,7 +1950,7 @@ function freePart(p){
   else if (p.kind === 'sheet') p.texs.forEach(e => freeTF(e.t, e.f));   // the sheets of the other size, held only by the history
   else if (p.kind === 'stack') { if (p.held) freeTF(p.layer.tex, p.layer.fbo); }   // a layer still in the document is not the history's to free
   else if (p.kind === 'props') return;
-  else p.tex.forEach((t, i) => freeTF(t, p.fbo[i]));
+  else p.tex.forEach((t, i) => { if (t) unpoolTex(t, p.fbo[i]); });
 }
 function freeEntry(e){ e.parts.forEach(freePart); undoBytes -= e.bytes; }
 function clearUndo(){ undoStack.forEach(freeEntry); redoStack.forEach(freeEntry); undoStack = []; redoStack = []; undoBytes = 0; }
@@ -1964,7 +1972,7 @@ function restorePart(p){
     blit(p.f, p.layer.fbo, 0, 0, p.w, p.h, p.x, p.y); freePart(p); return cur;
   }
   const cur = snapSim();
-  [fW, fP, fD].forEach((arr, i) => blit(p.fbo[i], arr[si], 0, 0, sim.w, sim.h, 0, 0));
+  [fW, fP, fD].forEach((arr, i) => { if (p.fbo[i]) blit(p.fbo[i], arr[si], 0, 0, sim.w, sim.h, 0, 0); else clearF(arr[si]); });
   simResync(true);
   simOwner = p.owner; simHasContent = p.has;
   if (p.wet) wake(); else { simSteps = 0; }
@@ -2220,7 +2228,7 @@ function flushDabs(){
     // mix with the wash as it was before this stroke, not with what the stroke has already covered
     const preSim = stroke ? stroke.parts.find(pt => pt.kind === 'sim') : null;
     target(I.layer.fbo); gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    use(progs.gouache, { ...sh, u_plod:0, u_col: I.abs.map(v => Math.min(4, v)), u_alpha: alpha, u_mix: mx, u_simOn: simOn, u_cur: mx > 0 && stroke && stroke.layerSnap ? backup : dummy, u_P: preSim ? preSim.tex[1] : P[si], u_D: preSim ? preSim.tex[2] : D[si] }); draw();
+    use(progs.gouache, { ...sh, u_plod:0, u_col: I.abs.map(v => Math.min(4, v)), u_alpha: alpha, u_mix: mx, u_simOn: simOn, u_cur: mx > 0 && stroke && stroke.layerSnap ? backup : dummy, u_P: preSim ? preSim.tex[1] || dummy : P[si], u_D: preSim ? preSim.tex[2] || dummy : D[si] }); draw();
     if (stroke ? stroke.eraseSim : (simOwner === I.layer && simHasContent)) {
       // opaque paint hides the wet watercolour underneath it on the same layer
       simTouchDabs(data); target(simFbo[si]); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
