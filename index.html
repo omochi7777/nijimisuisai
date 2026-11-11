@@ -1439,16 +1439,26 @@ void main(){
 }`;
 
 /* ================= GL helpers ================= */
+// Shaders are compiled once each (the two vertex shaders are shared), and every program is handed to the driver before any
+// is asked how it went: asking at once would make it compile them one by one, while the page waits
+gl.getExtension('KHR_parallel_shader_compile');
+const shaderCache = new Map();
 function shader(type, src){
-  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(s); console.error(log); throw new Error(log); }
+  let s = shaderCache.get(src); if (s) return s;
+  s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); shaderCache.set(src, s);
   return s;
 }
-function program(vs, fs){
-  const p = gl.createProgram();
-  gl.attachShader(p, shader(gl.VERTEX_SHADER, vs)); gl.attachShader(p, shader(gl.FRAGMENT_SHADER, fs));
-  gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+function programStart(vs, fs){
+  const p = gl.createProgram(), v = shader(gl.VERTEX_SHADER, vs), f = shader(gl.FRAGMENT_SHADER, fs);
+  gl.attachShader(p, v); gl.attachShader(p, f); gl.linkProgram(p);
+  return { p, v, f };
+}
+function program(vs, fs){ return programDone(programStart(vs, fs)); }
+function programDone({ p, v, f }){
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    for (const sh of [v, f]) if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(sh); console.error(log); throw new Error(log); }
+    throw new Error(gl.getProgramInfoLog(p));
+  }
   const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
   for (let i = 0; i < n; i++) { const inf = gl.getActiveUniform(p, i); u[inf.name.replace(/\[0\]$/, '')] = { loc: gl.getUniformLocation(p, inf.name), type: inf.type, size: inf.size }; }
   return { p, u };
@@ -1497,15 +1507,20 @@ function blit(src, dst, sx, sy, w, h, dx, dy){
 }
 function freeTF(t, f){ if (f) gl.deleteFramebuffer(f); if (t) gl.deleteTexture(t); }
 
-let progs;
+let progs = {};
 try {
-  progs = {
-    paper: program(VS_FULL, FS_PAPER), flux: program(VS_FULL, FS_FLUX), update: program(VS_FULL, FS_UPDATE),
-    finalize: program(VS_FULL, FS_FINALIZE), bake: program(VS_FULL, FS_BAKE), comp: program(VS_FULL, FS_COMP),
-    brush: program(VS_DAB, FS_BRUSH), simErase: program(VS_DAB, FS_SIMERASE), layerErase: program(VS_DAB, FS_LAYERERASE),
-    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM), ease: program(VS_FULL, FS_EASE), simPaper: program(VS_FULL, FS_SIMPAPER), merge: program(VS_FULL, FS_MERGE), resample: program(VS_FULL, FS_RESAMPLE),
+  const now = {
+    paper: [VS_FULL, FS_PAPER], flux: [VS_FULL, FS_FLUX], update: [VS_FULL, FS_UPDATE], simPaper: [VS_FULL, FS_SIMPAPER],
+    finalize: [VS_FULL, FS_FINALIZE], bake: [VS_FULL, FS_BAKE], comp: [VS_FULL, FS_COMP],
+    brush: [VS_DAB, FS_BRUSH], simErase: [VS_DAB, FS_SIMERASE], layerErase: [VS_DAB, FS_LAYERERASE],
+    pencil: [VS_DAB, FS_PENCIL], pen: [VS_DAB, FS_PEN], reduce: [VS_FULL, FS_REDUCE], wetmap: [VS_FULL, FS_WETMAP], sum: [VS_FULL, FS_SUM], gouache: [VS_DAB, FS_GOUACHE],
   };
+  const started = Object.entries(now).map(([k, [vs, fs]]) => [k, programStart(vs, fs)]);
+  for (const [k, st] of started) progs[k] = programDone(st);
 } catch (err) { fatal('シェーダーの準備に失敗しました: ' + err.message); console.error(err); return; }
+// the ones only some actions use are made the first time they are needed
+for (const [k, vs, fs] of [['xform', VS_FULL, FS_XFORM], ['ease', VS_FULL, FS_EASE], ['merge', VS_FULL, FS_MERGE], ['resample', VS_FULL, FS_RESAMPLE]])
+  Object.defineProperty(progs, k, { configurable:true, get(){ const v = program(vs, fs); Object.defineProperty(progs, k, { value:v }); return v; } });
 
 const emptyVAO = gl.createVertexArray();
 const dabVAO = gl.createVertexArray(); const dabBuf = gl.createBuffer();
