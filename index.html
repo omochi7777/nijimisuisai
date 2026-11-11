@@ -1115,7 +1115,11 @@ void main(){
       float wd = clamp(min(h, Wq.r) / .1, 0., 1.) * (.25 + .9 * vnoise(vec2(c + q) * .07 + 3.7) + .6 * vnoise(vec2(c + q) * .21 + 9.1));
       float vv = .5 * (paperAt(c).a + paperAt(q).a);
       float cond = mix(1., .12 + 2.6 * vv * vv, clamp(u_vein, 0., 1.)) * (1. + max(0., u_vein - 1.) * 1.5 * vv);
-      Pn += min(.12, u_pdiff * wd * cond) * (Pq - P);   // capped: with the 45% advection limit the cell never gives away more than it holds
+      // what evens out is how strong the paint is (amount per depth), carried through the shallower of the two: a deep pool
+      // keeps its paint instead of handing it to a thin edge. Over even depth this is the plain difference of amounts.
+      // Capped: with the 45% advection limit the cell never gives away more than it holds (each term is at most the amount)
+      float hm = min(h, Wq.r);
+      Pn += min(.12, u_pdiff * wd * cond) * (Pq * (hm / Wq.r) - P * (hm / h));
     }
     if(Wq.r < 1e-4 && Wq.g < .5) dryN += 1.;
     hNmax = max(hNmax, Wq.r);
