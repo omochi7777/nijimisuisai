@@ -1174,6 +1174,11 @@ const FS_WETMAP = HEAD + `
 uniform sampler2D u_W; uniform vec2 u_size;
 out vec4 o;
 void main(){ vec4 w = texture(u_W, gl_FragCoord.xy / u_size); o = vec4(clamp(w.r * 10., 0., 1.), clamp(w.g, 0., 1.), 0., 1.); }`;
+// how easily water gets into the paper (1 - the threshold the simulation uses), for the threads of ink to follow
+const FS_EASE = HEAD + SIM_COMMON + `
+uniform vec2 u_size;
+out vec4 o;
+void main(){ SZ = ivec2(u_size); o = vec4(1. - clamp(thrSrc(ivec2(gl_FragCoord.xy)), 0., 1.), 0., 0., 1.); }`;
 const FS_RESAMPLE = HEAD + `
 uniform sampler2D u_src; uniform vec2 u_srcSize, u_off, u_scale; uniform float u_lod;   // a new-sheet point p shows the old one at (p - off) / scale
 out vec4 o;
@@ -1481,7 +1486,7 @@ try {
     paper: program(VS_FULL, FS_PAPER), flux: program(VS_FULL, FS_FLUX), update: program(VS_FULL, FS_UPDATE),
     finalize: program(VS_FULL, FS_FINALIZE), bake: program(VS_FULL, FS_BAKE), comp: program(VS_FULL, FS_COMP),
     brush: program(VS_DAB, FS_BRUSH), simErase: program(VS_DAB, FS_SIMERASE), layerErase: program(VS_DAB, FS_LAYERERASE),
-    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM), merge: program(VS_FULL, FS_MERGE), resample: program(VS_FULL, FS_RESAMPLE),
+    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM), ease: program(VS_FULL, FS_EASE), merge: program(VS_FULL, FS_MERGE), resample: program(VS_FULL, FS_RESAMPLE),
   };
 } catch (err) { fatal('シェーダーの準備に失敗しました: ' + err.message); console.error(err); return; }
 
@@ -1743,8 +1748,9 @@ function createDoc(w, h, q, seed, off){
   renderLayers(); view.r = 0; updateRotUI(); fitView(); updateUndoUI(); dirty = true;
   syncSizeBtn();
 }
+let paperGen = 0;   // counts new paper patterns
 function genPaper(){
-  const pp = PAPERS[S.paper];
+  const pp = PAPERS[S.paper]; paperGen++;
   gl.disable(gl.BLEND); target(paperFbo);
   use(progs.paper, { u_seed:paperSeed, u_scale:pp.scale, u_bump:pp.bump, u_large:pp.large, u_fine:pp.fine, u_fiber:pp.fiber, u_off:paperOff });
   drawFull();
@@ -2320,6 +2326,22 @@ function wetAt(x, y){
   const i = (my * wetMap.w + mx) * 4, h = wetMap.data[i] / 255, s = wetMap.data[i + 1] / 255;
   return h > .02 ? 1 : s > .55 ? .6 : 0;     // water film, or damp paper the ink can still creep into
 }
+// the paper's ease at half its size, read once per pattern and "veins" setting
+let easeMap = null;
+function easeAt(x, y){
+  const key = paperGen + '|' + S.vein + '|' + doc.w + 'x' + doc.h;
+  if (!easeMap || easeMap.key !== key) {
+    const mw = Math.max(8, Math.round(doc.w / 2)), mh = Math.max(8, Math.round(doc.h / 2));
+    const t = mkTex(mw, mh, 'u8'), f = mkFbo([t]);
+    gl.disable(gl.BLEND); target(f);
+    use(progs.ease, { u_paper:paperTex, u_plod: Math.log2(doc.w / mw), u_vein: S.vein / 100, u_fiberThr: PAPERS[S.paper].fiberThr, u_size:[mw, mh] }); drawFull();
+    const px = new Uint8Array(mw * mh * 4); gl.readPixels(0, 0, mw, mh, gl.RGBA, gl.UNSIGNED_BYTE, px); target(null); freeTF(t, f);
+    const e = new Uint8Array(mw * mh); for (let i = 0; i < e.length; i++) e[i] = px[i * 4];
+    easeMap = { key, w:mw, h:mh, e };
+  }
+  const mx = clamp(Math.floor(x / doc.w * easeMap.w), 0, easeMap.w - 1), my = clamp(Math.floor(y / doc.h * easeMap.h), 0, easeMap.h - 1);
+  return easeMap.e[my * easeMap.w + mx] / 255;
+}
 function spawnTendrils(x, y, R, a0, spread, n, scale){
   if (!qInfo || S.vein <= 0 || !wetAt(x, y)) return;
   const v = S.vein / 100;
@@ -2336,6 +2358,7 @@ function stepTendrils(){
   if (!tips.length) return;
   const v = S.vein / 100;
   const tl = Math.hypot(tilt.x, tilt.y), ta = Math.atan2(tilt.y, tilt.x) - view.r;
+  const steer = .7 * Math.min(1.6, v) * (1 + 1.5 * PAPERS[S.paper].fiberThr);
   const out = [];
   for (let i = tips.length - 1; i >= 0; i--) {
     const t = tips[i];
@@ -2345,6 +2368,9 @@ function stepTendrils(){
     for (let k = 0; k < n; k++) {
       t.a += t.wobble + (Math.random() - .5) * .32;
       if (tl > .02) t.a += Math.sin(ta - t.a) * .09 * tl;   // on a tilted sheet the threads of ink lean downhill
+      // and they lean towards where the paper lets water in more easily: along the veins, and the fibres of washi
+      { const L = 7, da = .4, el = easeAt(t.x + Math.cos(t.a - da) * L, t.y + Math.sin(t.a - da) * L), er = easeAt(t.x + Math.cos(t.a + da) * L, t.y + Math.sin(t.a + da) * L);
+        t.a += clamp((er - el) * steer, -.1, .1); }
       const step = .7 + .6 * (1 - f);
       t.x += Math.cos(t.a) * step; t.y += Math.sin(t.a) * step; t.age += 1;
       const wet = wetAt(t.x, t.y);
