@@ -1822,7 +1822,14 @@ function checkDryness(){
   gl.readPixels(0, 0, RED, RED, gl.RGBA, gl.FLOAT, redBuf);
   let mh = 0, ms = 0; for (let i = 0; i < redBuf.length; i += 4) { mh = Math.max(mh, redBuf[i]); ms = Math.max(ms, redBuf[i + 1]); }
   paperMaxH = mh;
-  if (mh < 1e-4) { const p = simParams(); const left = Math.ceil(Math.max(0, ms - p.delta * .5) / p.evapS); if (left < 4) simSteps = 1; else simSteps = Math.min(simSteps, left); }
+  const p = simParams();
+  if (mh < 1e-4) { const left = Math.ceil(Math.max(0, ms - p.delta * .5) / p.evapS); if (left < 4) simSteps = 1; else simSteps = Math.min(simSteps, left); }
+  else {
+    // a deep puddle (up to 3 deep) outlasts the count wake() starts from: give it the steps it needs to evaporate and soak in,
+    // or it would be fixed all at once half-way through, its pigment still on the way to the rim
+    const need = Math.ceil(mh * 1.1 / p.evap + 1 / p.evapS);
+    if (need > simSteps) { simSteps = need; wetFull = Math.max(wetFull, need); }
+  }
 }
 
 /* ================= undo ================= */
