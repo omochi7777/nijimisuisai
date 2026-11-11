@@ -1023,6 +1023,7 @@ void main(){
 /* ---- watercolour simulation: virtual-pipe shallow water + pigment transport ---- */
 const SIM_COMMON = `
 uniform sampler2D u_paper; uniform float u_fiberThr, u_plod;
+uniform float u_res;   // sim cells per paper pixel: noise is laid out in paper pixels, so the light sheet shows the same pattern
 ivec2 SZ;
 vec4 paperAt(ivec2 c){ return textureLod(u_paper, (vec2(c)+.5)/vec2(SZ), u_plod); }
 uniform float u_vein;
@@ -1058,7 +1059,7 @@ void main(){
       bool damp = Wq.g > u_openB + u_openV * thrSrc(q);
       if(u_breach > 50. || tl < 0.) open = damp;   // lying flat (or uphill): as always
       // only where water has pooled deep enough (the bead at the low edge) does it spill: damp paper alone would let it creep downhill in threads
-      else if(h > u_breach * (.5 + thrSrc(q)) * (.5 + vnoise(vec2(q) * .05 + 11.3))){
+      else if(h > u_breach * (.5 + thrSrc(q)) * (.5 + vnoise(vec2(q) / u_res * .05 + 11.3))){
         // a straight or hollow front can move on, a narrow bulge cannot, and spreading sideways comes easier than
         // running ahead: so the water moves as one sheet with a smooth edge instead of a comb of thin runs
         int wetN = 0;
@@ -1066,7 +1067,7 @@ void main(){
         open = wetN >= (tl > 0. ? 10 : 7);
       }
     }
-    float jit = 1. + .8 * (vnoise(vec2(q) * .13 + vec2(u_time * .031, -u_time * .019)) - .5) + .3 * (hash12(vec2(q) * .731 + vec2(c) * .113 + u_time) - .5);
+    float jit = 1. + .8 * (vnoise(vec2(q) / u_res * .13 + vec2(u_time * .031, -u_time * .019)) - .5) + .3 * (hash12(vec2(q) * .731 + vec2(c) * .113 + u_time) - .5);
     jit = mix(jit, jit * (.4 + 1.6 * paperAt(q).a), clamp(u_vein * .4, 0., .8));
     // the jitter roughens how puddles level out; the pull of a tilt stays nearly even, or it would carve the sheet into channels
     nf[i] = open ? max(0., f[i] + u_g * ((hc - hq - tl) * jit + tl * mix(1., jit, .2))) : 0.;
@@ -1112,7 +1113,7 @@ void main(){
     hn += fin; finT += fin;
     if(fin > 0. && Wq.r > 1e-5){ Pn += Pq * clamp(fin / Wq.r, 0., 1.) * u_pdrag; stir += Wq.b * clamp(fin / Wq.r, 0., 1.); }
     if(h > 1e-4 && Wq.r > 1e-4){
-      float wd = clamp(min(h, Wq.r) / .1, 0., 1.) * (.25 + .9 * vnoise(vec2(c + q) * .07 + 3.7) + .6 * vnoise(vec2(c + q) * .21 + 9.1));
+      float wd = clamp(min(h, Wq.r) / .1, 0., 1.) * (.25 + .9 * vnoise(vec2(c + q) / u_res * .07 + 3.7) + .6 * vnoise(vec2(c + q) / u_res * .21 + 9.1));
       float vv = .5 * (paperAt(c).a + paperAt(q).a);
       float cond = mix(1., .12 + 2.6 * vv * vv, clamp(u_vein, 0., 1.)) * (1. + max(0., u_vein - 1.) * 1.5 * vv);
       // what evens out is how strong the paint is (amount per depth), carried through the shallower of the two: a deep pool
@@ -1141,11 +1142,11 @@ void main(){
     // stirring is strongest where the water runs fast, but ink keeps curling slowly even in a calm pool
     float sp = .35 + .65 * clamp(length(vec2(F.y - F.x, F.w - F.z)) / max(h, .03) * 3., 0., 1.);
     {
-      vec2 q0 = vec2(c) * .03 + vec2(u_time * .0016, -u_time * .0011);
+      vec2 q0 = vec2(c) / u_res * .03 + vec2(u_time * .0016, -u_time * .0011);
       #define PSI(v) (vnoise(v) + .5 * vnoise((v) * 2.3 + 7.1))
       float e = .35;
       vec2 curl = vec2(PSI(q0 + vec2(0, e)) - PSI(q0 - vec2(0, e)), PSI(q0 - vec2(e, 0)) - PSI(q0 + vec2(e, 0))) / (2. * e);
-      vec2 d = curl * u_swirl * sp * min(1., stir * 1.5); float dl = length(d); if(dl > .8) d *= .8 / dl;
+      vec2 d = curl * u_swirl * sp * min(1., stir * 1.5) * u_res; float dl = length(d); if(dl > .8) d *= .8 / dl;
       vec2 uvb = (vec2(c) + .5 - d) / vec2(SZ);
       if(texture(u_W, uvb).r > .02) Pn += texture(u_P, uvb) - P;
     }
@@ -1688,11 +1689,14 @@ const UNDO_BUDGET = (isCoarse ? 200 : 520) * 1024 * 1024;
 function simParams(){
   const pp = PAPERS[S.paper]; const bleed = S.bleed / 100, dry = S.drySpd / 100;
   const tf = Math.min(1, Math.hypot(tilt.x, tilt.y) / .15);   // how far the tilted-sheet behaviour has faded in
+  // spreading is counted in cells; a light sheet's cells are bigger, so it spreads by q (water: q squared, it is a wave and a
+  // diffusion; paint and damp: q squared, diffusions) to cover the same paper in the same time as the full-detail sheet
+  const q2 = simQ * simQ;
   return {
-    g:.14, damp:.9, slope:.05, openB: pp.openB / (.6 + .4 * bleed), openV: pp.openV / (.6 + .4 * bleed), fiberThr: pp.fiberThr,
-    evap: .00024 * dry * simBoost, edgeEvap: 6, absorb: pp.absorb, sCost: pp.sCost, capK: Math.min(.95, pp.capK * 4 * bleed),
+    g:.14 * q2, damp:.9, slope:.05, openB: pp.openB / (.6 + .4 * bleed), openV: pp.openV / (.6 + .4 * bleed), fiberThr: pp.fiberThr,
+    evap: .00024 * dry * simBoost, edgeEvap: 6, absorb: pp.absorb, sCost: pp.sCost, capK: Math.min(.95, pp.capK * 4 * bleed) * q2,
     delta: pp.delta / (.5 + .5 * bleed), sigB: pp.sigB / (.6 + .4 * bleed), sigV: pp.sigV / (.6 + .4 * bleed), evapS: .0009 * dry * simBoost,
-    vein: S.vein / 100, dep: .001, depDry: .1, desorb: .0012, pdiff: Math.min(.16, .1 * bleed) * (1 - .6 * tf), bloom: 3.5, granStr: S.gran / 100,
+    vein: S.vein / 100, dep: .001, depDry: .1, desorb: .0012, pdiff: Math.min(.16, .1 * bleed) * (1 - .6 * tf) * q2, bloom: 3.5, granStr: S.gran / 100,
     tilt: (t => [t.x * TILT_K / simQ, t.y * TILT_K / simQ])(rotV(tilt.x, tilt.y, -view.r)), breach: tf > 0 ? TILT_BREACH : 99,
     pdrag: 1 - .6 * tf, swirl: .6 * tf, film: .05 * tf, thinSlow: tf,
   };
@@ -1885,10 +1889,10 @@ function simStep(){
   }
   gl.disable(gl.BLEND);
   target(fF[1 - fi]);
-  use(progs.flux, { u_W:W[si], u_F:F[fi], u_paper:paperTex, u_plod: simLod(), u_vein:p.vein, u_g:p.g, u_damp:p.damp, u_slope:p.slope, u_openB:p.openB, u_openV:p.openV, u_fiberThr:p.fiberThr, u_time:simTime, u_tilt:p.tilt, u_breach:p.breach, u_film:p.film });
+  use(progs.flux, { u_W:W[si], u_F:F[fi], u_paper:paperTex, u_plod: simLod(), u_res: simQ, u_vein:p.vein, u_g:p.g, u_damp:p.damp, u_slope:p.slope, u_openB:p.openB, u_openV:p.openV, u_fiberThr:p.fiberThr, u_time:simTime, u_tilt:p.tilt, u_breach:p.breach, u_film:p.film });
   drawFull(); fi = 1 - fi;
   target(simFbo[1 - si]);
-  use(progs.update, { u_W:W[si], u_F:F[fi], u_P:P[si], u_D:D[si], u_paper:paperTex, u_plod: simLod(), u_vein:p.vein, u_fiberThr:p.fiberThr,
+  use(progs.update, { u_W:W[si], u_F:F[fi], u_P:P[si], u_D:D[si], u_paper:paperTex, u_plod: simLod(), u_res: simQ, u_vein:p.vein, u_fiberThr:p.fiberThr,
     u_evap:p.evap, u_edgeEvap:p.edgeEvap, u_absorb:p.absorb, u_sCost:p.sCost, u_capK:p.capK, u_delta:p.delta, u_sigB:p.sigB, u_sigV:p.sigV, u_evapS:p.evapS,
     u_dep:p.dep, u_depDry:p.depDry, u_desorb:p.desorb, u_pdiff:p.pdiff, u_granStr:p.granStr, u_bloom:p.bloom,
     u_pdrag:p.pdrag, u_swirl:p.swirl, u_thinSlow:p.thinSlow, u_time:swirlClock });
