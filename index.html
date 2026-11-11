@@ -3745,7 +3745,9 @@ async function packSplit(u16){
   if (typeof CompressionStream === 'undefined') return { raw:true, split:true, buf:b.buffer };
   return { raw:false, split:true, buf: await new Response(new Blob([b]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer() };
 }
-function thumbnail(){
+function thumbnail(){ const r = thumbStart(); return thumbJpeg(r, readTake(r)); }
+// the thumbnail drawn and its pixels on their way back (see readStart)
+function thumbStart(){
   const tw = 240, th = Math.max(1, Math.round(240 * doc.h / doc.w)), sc = tw / doc.w;
   const t = mkTex(tw, th, 'u8'), f = mkFbo([t]);
   gl.disable(gl.BLEND); target(f);
@@ -3756,25 +3758,60 @@ function thumbnail(){
   const op = new Float32Array(8);
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
   U.u_op = op; use(progs.comp, U); drawFull();
-  const px = new Uint8Array(tw * th * 4); gl.readPixels(0, 0, tw, th, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  const r = readStart(f, tw, th, 'u8'); r.tw = tw; r.th = th;
   target(null); freeTF(t, f); dirty = true;
+  return r;
+}
+function thumbJpeg({ tw, th }, px){
   const c = document.createElement('canvas'); c.width = tw; c.height = th;
   c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px.buffer), tw, th), 0, 0);
   return c.toDataURL('image/jpeg', .82);
 }
-// read the whole picture off the GPU in one go (synchronously, so nothing can change it half-way); compressing it comes after
-function captureDrawing(){
+// Reading pixels back without stalling: the copy into a buffer is queued with the GPU's other work (so it holds the picture
+// exactly as it is at this point, whatever is drawn next), and the bytes are taken once the GPU has got that far
+function readStart(fbo, w, h, kind){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  if (halfRead == null) halfRead = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE) === gl.HALF_FLOAT && gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT) === gl.RGBA;
+  const u8 = kind === 'u8', type = u8 ? gl.UNSIGNED_BYTE : halfRead ? gl.HALF_FLOAT : gl.FLOAT, n = w * h * 4;
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buf);
+  gl.bufferData(gl.PIXEL_PACK_BUFFER, n * (u8 ? 1 : type === gl.FLOAT ? 4 : 2), gl.STREAM_READ);
+  gl.readPixels(0, 0, w, h, gl.RGBA, type, 0);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { buf, n, type };
+}
+// the bytes (u8, or half-floats as Uint16); waits for the GPU if it has not got there yet
+function readTake(r){
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, r.buf);
+  let out;
+  if (r.type === gl.UNSIGNED_BYTE) { out = new Uint8Array(r.n); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, out); }
+  else if (r.type === gl.HALF_FLOAT) { out = new Uint16Array(r.n); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, out); }
+  else { const f = new Float32Array(r.n); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, f); out = new Uint16Array(f.length); for (let i = 0; i < f.length; i++) out[i] = f[i] === 0 ? 0 : toHalf(f[i]); }
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); gl.deleteBuffer(r.buf);
+  return out;
+}
+// resolves once the GPU has done everything asked of it so far (checked between frames, never blocking one)
+async function gpuDone(){
+  const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); gl.flush();
+  try { for (let k = 0; k < 500 && gl.clientWaitSync(sync, 0, 0) === gl.TIMEOUT_EXPIRED; k++) await new Promise(r => setTimeout(r, 8)); }
+  finally { gl.deleteSync(sync); }
+}
+// the whole picture, as it is now: the reads are all queued at once (so nothing can change it half-way) and collected when the
+// GPU has done them; compressing it comes after
+async function captureDrawing(){
   flushDabs();
-  const raw = layers.map(L => readHalf(L.fbo, doc.w, doc.h));
-  let simRaw = null;
+  const reads = layers.map(L => readStart(L.fbo, doc.w, doc.h));
+  let simRead = null;
   if (simOwner && simHasContent) {
     const t = mkTex(sim.w, sim.h), f = mkFbo([t]);
     gl.disable(gl.BLEND); target(f); use(progs.sum, { u_P:P[si], u_D:D[si] }); drawFull(); target(null);
-    simRaw = readHalf(f, sim.w, sim.h); freeTF(t, f);
+    simRead = readStart(f, sim.w, sim.h); freeTF(t, f);
   }
-  const meta = { v:1, w:doc.w, h:doc.h, q:simQ, paper:S.paper, seed:paperSeed, active: layers.indexOf(active), owner: simRaw ? layers.indexOf(simOwner) : -1,
+  const th = thumbStart();
+  const meta = { v:1, w:doc.w, h:doc.h, q:simQ, paper:S.paper, seed:paperSeed, active: layers.indexOf(active), owner: simRead ? layers.indexOf(simOwner) : -1,
     layers: layers.map(L => ({ name:L.name, visible:L.visible, opacity:L.opacity })), name: docName, poff: paperOff, tint: paperTint, flat: flatPaper, savedAt: Date.now() };
-  return { raw, simRaw, meta, thumb: thumbnail() };
+  await gpuDone();
+  const raw = reads.map(readTake), simRaw = simRead ? readTake(simRead) : null;
+  return { raw, simRaw, meta, thumb: thumbJpeg(th, readTake(th)) };
 }
 let saveTimer = 0, saving = false, saveGen = 0, docReady = false, vaultOK = typeof indexedDB !== 'undefined', restoring = false;
 const newWorkId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3838,9 +3875,9 @@ async function saveDrawing(){
   const gen = saveGen;   // bumped when the save is deleted: a save still compressing must not bring it back
   const seq = changeSeq;   // the changes this save will cover
   try {
-    const { raw, simRaw, meta, thumb } = captureDrawing();
     if (!curWork) curWork = newWorkId();
-    const id = curWork;   // what was read above belongs to this work, even if another is opened while it compresses
+    const id = curWork;   // what is read now belongs to this work, even if another is opened while it is read back and compressed
+    const { raw, simRaw, meta, thumb } = await captureDrawing();
     const data = [];
     for (const r of raw) data.push(await pack(r));
     const simData = simRaw ? await pack(simRaw) : null;
@@ -4062,7 +4099,7 @@ $('#forgetBtn').addEventListener('click', async () => {
 const NJ_MAGIC = [78, 73, 74, 73, 77, 73, 0], NJ_VERSION = 1, NJ_MAX_SIDE = 4096;
 function fmtSize(n){ return n < 1048576 ? Math.max(1, Math.round(n / 1024)) + 'KB' : n < 1073741824 ? (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + 'MB' : (n / 1073741824).toFixed(n < 10737418240 ? 1 : 0) + 'GB'; }
 async function buildNijimi(){
-  const { raw, simRaw, meta, thumb } = captureDrawing();
+  const { raw, simRaw, meta, thumb } = await captureDrawing();
   const parts = [];
   for (const r of raw) parts.push(await packSplit(r));
   if (simRaw) parts.push(await packSplit(simRaw));
