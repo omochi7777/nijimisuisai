@@ -1715,7 +1715,7 @@ function allocSheet(w, h, q, seed, off){
     simFbo[i] = mkFbo([W[i], P[i], D[i]]); fW[i] = mkFbo([W[i]]); fP[i] = mkFbo([P[i]]); fD[i] = mkFbo([D[i]]); fF[i] = mkFbo([F[i]]);
     clearF(simFbo[i]); clearF(fF[i]);
   }
-  si = 0; fi = 0; simOwner = null; simHasContent = false; simSteps = 0; simBoost = 1; tips.length = 0;
+  si = 0; fi = 0; simOwner = null; simHasContent = false; simSteps = 0; simBoost = 1; tips.length = 0; simRect = [0, 0, 0, 0]; dropFit();
   scratch = mkTex(w, h); scratchF = mkFbo([scratch]); backup = mkTex(w, h); backupF = mkFbo([backup]);
 }
 function freeDoc(){
@@ -1794,9 +1794,91 @@ function mergeDown(){
 }
 
 /* ================= simulation ================= */
-function clearSim(){ for (let i = 0; i < 2; i++) { clearF(simFbo[i]); clearF(fF[i]); } simHasContent = false; simSteps = 0; simBoost = 1; tips.length = 0; }
+// Only the part of the sheet where something can change is computed: simRect, [x0, y0, x1, y1) in sim cells, or null for
+// all of it. Outside it the paper is dry and still (no water, no damp, no moving paint, nothing flowing in), and both buffers
+// of each pair hold the same there (fluxes 0), so whichever is current, it reads the same.
+// Water and damp move at most a cell a step, so the rectangle grows by one each step; anything drawn into the simulation
+// widens it (simTouch); every so often it is fitted again to what is really wet (fitSimRect).
+let simRect = [0, 0, 0, 0];
+let simStepN = 0;   // steps run so far
+let fitRead = null, fitAcc = null, lastFitN = 0;   // a refit read on its way back from the GPU, and what was drawn since it was asked for
+const fitPBO = gl.createBuffer(), fitBuf = new Float32Array(48 * 48 * 4);
+const rectEmpty = r => r[2] <= r[0] || r[3] <= r[1];
+function clampRect(r){ return [Math.max(0, r[0]), Math.max(0, r[1]), Math.min(sim.w, r[2]), Math.min(sim.h, r[3])]; }
+// paper pixels x0..x1, y0..y1 were drawn into (the current buffers only)
+function simTouch(x0, y0, x1, y1){
+  if (!simRect) return;
+  const q = sim.w / doc.w, a = clampRect([Math.floor(x0 * q) - 2, Math.floor(y0 * q) - 2, Math.ceil(x1 * q) + 2, Math.ceil(y1 * q) + 2]);
+  if (rectEmpty(a)) return;
+  simRect = rectUnion(simRect, a);
+  if (fitRead) fitAcc = rectUnion(fitAcc, a);
+}
+function rectUnion(r, a){ return rectEmpty(r) ? a : rectEmpty(a) ? r : [Math.min(r[0], a[0]), Math.min(r[1], a[1]), Math.max(r[2], a[2]), Math.max(r[3], a[3])]; }
+// dabs as queued for drawing (x, y, radius, ... 8 numbers each): their footprint stays inside 1.12 radius plus a pixel
+function simTouchDabs(data){
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (let i = 0; i < data.length; i += 8) { const m = data[i + 2] * 1.3 + 3; x0 = Math.min(x0, data[i] - m); y0 = Math.min(y0, data[i + 1] - m); x1 = Math.max(x1, data[i] + m); y1 = Math.max(y1, data[i + 1] + m); }
+  if (x1 > x0) simTouch(x0, y0, x1, y1);
+}
+// the current buffers were changed all over (restored, loaded, dried): make the other ones the same, then look at what is wet
+function simResync(fit){
+  dropFit();
+  for (const a of [fW, fP, fD]) blit(a[si], a[1 - si], 0, 0, sim.w, sim.h, 0, 0);
+  clearF(fF[0]); clearF(fF[1]);
+  simRect = [0, 0, 0, 0];
+  if (fit) { simRect = null; reduceWet(); fitSimRect(); }
+}
+// fit the rectangle to the wet blocks a reduction found, keeping both buffers the same outside it.
+// late: steps run since the reduction was taken (the water may have spread that far since); acc: drawn into since then
+function fitSimRect(buf = redBuf, late = 0, acc = null){
+  const bw = Math.ceil(sim.w / RED), bh = Math.ceil(sim.h / RED), m = 2 + late;
+  let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+  for (let by = 0; by < RED; by++) for (let bx = 0; bx < RED; bx++) {
+    const i = (by * RED + bx) * 4; if (buf[i] > 0 || buf[i + 1] > 0) { x0 = Math.min(x0, bx); y0 = Math.min(y0, by); x1 = Math.max(x1, bx); y1 = Math.max(y1, by); }
+  }
+  const old = simRect ? simRect : [0, 0, sim.w, sim.h];
+  let nr = x1 < 0 ? [0, 0, 0, 0] : clampRect([x0 * bw - m, y0 * bh - m, (x1 + 1) * bw + m, (y1 + 1) * bh + m]);
+  if (acc && !rectEmpty(acc)) nr = rectUnion(nr, clampRect([acc[0] - m, acc[1] - m, acc[2] + m, acc[3] + m]));   // what was drawn has spread since, too
+  // never wider than it already is: everything that can change is inside the current one
+  nr = [Math.max(nr[0], old[0]), Math.max(nr[1], old[1]), Math.min(nr[2], old[2]), Math.min(nr[3], old[3])];
+  if (rectEmpty(nr)) nr = [0, 0, 0, 0];
+  // the cells left out are dry now, but the other buffers may still hold them as they were a step ago
+  if (!rectEmpty(old)) for (const a of [fW, fP, fD]) blit(a[si], a[1 - si], old[0], old[1], old[2] - old[0], old[3] - old[1], old[0], old[1]);
+  // fluxes: keep the current ones inside the new rectangle, nothing anywhere else in either buffer
+  clearF(fF[1 - fi]);
+  if (!rectEmpty(nr)) blit(fF[fi], fF[1 - fi], nr[0], nr[1], nr[2] - nr[0], nr[3] - nr[1], nr[0], nr[1]);
+  clearF(fF[fi]); fi = 1 - fi;
+  simRect = nr;
+}
+// the same, without waiting for the GPU: the reduction is read back a frame or two later (while painting, too)
+function requestFit(){
+  if (fitRead || !simRect || rectEmpty(simRect)) return;
+  gl.disable(gl.BLEND); target(redFbo);
+  use(progs.reduce, { u_W:W[si], u_block:[Math.ceil(sim.w / RED), Math.ceil(sim.h / RED)] }); drawFull();
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, fitPBO); gl.bufferData(gl.PIXEL_PACK_BUFFER, fitBuf.byteLength, gl.STREAM_READ);
+  gl.readPixels(0, 0, RED, RED, gl.RGBA, gl.FLOAT, 0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  fitRead = { sync: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0), n: simStepN }; fitAcc = [0, 0, 0, 0]; lastFitN = simStepN;
+  gl.flush();
+}
+function pollFit(){
+  if (!fitRead) return;
+  const st = gl.clientWaitSync(fitRead.sync, 0, 0);
+  if (st === gl.TIMEOUT_EXPIRED) return;
+  const r = fitRead, acc = fitAcc; dropFit();
+  if (st === gl.WAIT_FAILED) return;
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, fitPBO); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, fitBuf); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  if (simRect && !rectEmpty(simRect)) fitSimRect(fitBuf, simStepN - r.n, acc);
+}
+function dropFit(){ if (fitRead) { gl.deleteSync(fitRead.sync); fitRead = null; fitAcc = null; } }
+function clearSim(){ for (let i = 0; i < 2; i++) { clearF(simFbo[i]); clearF(fF[i]); } simHasContent = false; simSteps = 0; simBoost = 1; tips.length = 0; simRect = [0, 0, 0, 0]; dropFit(); }
 function simStep(){
   const p = simParams(); simTime = (simTime + .618) % 97; swirlClock = (swirlClock + 1) % 1e5;
+  if (simRect) {
+    if (rectEmpty(simRect)) return;   // nothing anywhere that could change
+    simStepN++;
+    simRect = clampRect([simRect[0] - 1, simRect[1] - 1, simRect[2] + 1, simRect[3] + 1]);
+    gl.enable(gl.SCISSOR_TEST); gl.scissor(simRect[0], simRect[1], simRect[2] - simRect[0], simRect[3] - simRect[1]);
+  }
   gl.disable(gl.BLEND);
   target(fF[1 - fi]);
   use(progs.flux, { u_W:W[si], u_F:F[fi], u_paper:paperTex, u_plod: simLod(), u_vein:p.vein, u_g:p.g, u_damp:p.damp, u_slope:p.slope, u_openB:p.openB, u_openV:p.openV, u_fiberThr:p.fiberThr, u_time:simTime, u_tilt:p.tilt, u_breach:p.breach, u_film:p.film });
@@ -1807,11 +1889,12 @@ function simStep(){
     u_dep:p.dep, u_depDry:p.depDry, u_desorb:p.desorb, u_pdiff:p.pdiff, u_granStr:p.granStr, u_bloom:p.bloom,
     u_pdrag:p.pdrag, u_swirl:p.swirl, u_thinSlow:p.thinSlow, u_time:swirlClock });
   drawFull(); si = 1 - si;
+  gl.disable(gl.SCISSOR_TEST);
 }
 function finalizeDry(){
   gl.disable(gl.BLEND); target(simFbo[1 - si]);
   use(progs.finalize, { u_P:P[si], u_D:D[si] }); drawFull(); si = 1 - si;
-  clearF(fF[0]); clearF(fF[1]); simSteps = 0; simBoost = 1; dirty = true; renderLayers();
+  simResync(false); simSteps = 0; simBoost = 1; dirty = true; renderLayers();
 }
 function bakeSim(withUndo){
   if (!simOwner || !simHasContent) return;
@@ -1825,10 +1908,13 @@ let paperMaxH = 1, wetFull = 1;
 function wake(){ simSteps = dryStepsFull(); wetFull = simSteps; simBoost = 1; paperMaxH = 1; }
 /* every so often, look at how wet the paper really is so the simulation can stop early (saves battery) */
 const RED = 48; const redTex = mkTex(RED, RED); const redFbo = mkFbo([redTex]); const redBuf = new Float32Array(RED * RED * 4);
-function checkDryness(){
+function reduceWet(){
   gl.disable(gl.BLEND); target(redFbo);
   use(progs.reduce, { u_W:W[si], u_block:[Math.ceil(sim.w / RED), Math.ceil(sim.h / RED)] }); drawFull();
   gl.readPixels(0, 0, RED, RED, gl.RGBA, gl.FLOAT, redBuf);
+}
+function checkDryness(){
+  reduceWet(); fitSimRect();
   let mh = 0, ms = 0; for (let i = 0; i < redBuf.length; i += 4) { mh = Math.max(mh, redBuf[i]); ms = Math.max(ms, redBuf[i + 1]); }
   paperMaxH = mh;
   const p = simParams();
@@ -1879,7 +1965,7 @@ function restorePart(p){
   }
   const cur = snapSim();
   [fW, fP, fD].forEach((arr, i) => blit(p.fbo[i], arr[si], 0, 0, sim.w, sim.h, 0, 0));
-  clearF(fF[0]); clearF(fF[1]);
+  simResync(true);
   simOwner = p.owner; simHasContent = p.has;
   if (p.wet) wake(); else { simSteps = 0; }
   freePart(p); return cur;
@@ -2060,7 +2146,8 @@ function cancelStroke(){
   stroke = null; dirty = true; renderLayers();
 }
 
-function coverSim(draw, aP, hard){
+function coverSim(draw, aP, hard, data){
+  simTouchDabs(data);
   gl.blendEquation(gl.FUNC_ADD); target(simFbo[si]); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
   use(progs.simErase, { u_doc:[doc.w, doc.h], u_pad:0, u_paper:paperTex, u_aW:0, u_aP:aP, u_aD:aP, u_tissue:0, u_scratch:0, u_shape:0, u_hard:hard, u_plod: simLod(), u_seed:0 });
   draw();
@@ -2081,6 +2168,7 @@ function flushDabs(){
   const docU = [doc.w, doc.h];
   const draw = () => { gl.bindVertexArray(dabVAO); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n); };
   if (WET.includes(tool)) {
+    simTouchDabs(data);
     target(simFbo[si]); gl.blendFunc(gl.ONE, gl.ONE);
     const sp = tool === 'sumi' ? .14 : .18;
     const fk = tool === 'flat' ? 1.8 : 1;
@@ -2098,6 +2186,7 @@ function flushDabs(){
     }
     simHasContent = true; wake();
   } else if (tool === 'tissue') {
+    simTouchDabs(data);
     target(simFbo[si]); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
     const s = ts.strength / 100;
     use(progs.simErase, { u_doc:docU, u_pad:0, u_paper:paperTex, u_aW:.4 * s, u_aP:.32 * s, u_aD:.05 * s, u_tissue:1, u_shape:0, u_hard:.55, u_plod: simLod(), u_seed:I.seed % 10 });
@@ -2107,7 +2196,7 @@ function flushDabs(){
     target(I.layer.fbo); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
     use(progs.layerErase, { u_doc:docU, u_pad:0, u_paper:paperTex, u_a:.2 * s }); draw();
     if (stroke ? stroke.eraseSim : (simOwner === I.layer && simHasContent)) {
-      target(simFbo[si]);
+      simTouchDabs(data); target(simFbo[si]);
       use(progs.simErase, { u_doc:docU, u_pad:0, u_paper:paperTex, u_aW:0, u_aP:.2 * s, u_aD:.2 * s, u_tissue:0, u_shape:0, u_hard:.55, u_plod: simLod(), u_seed:0 }); draw();
     }
   } else if (tool === 'pencil') {
@@ -2121,7 +2210,7 @@ function flushDabs(){
     if (whitePencil) gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA); else gl.blendFunc(gl.ONE, gl.ONE);
     use(progs.pencil, { u_doc:docU, u_pad:2.6, u_paper:paperTex, u_cur:scratch, u_plod:0, u_col:col, u_maxD:G.max, u_str:G.str * 1.35, u_soft:G.soft, u_seed:I.seed % 10, u_opaque: whitePencil ? 1 : 0 });
     draw();
-    if (whitePencil && stroke && stroke.eraseSim) coverSim(draw, .35, .6);
+    if (whitePencil && stroke && stroke.eraseSim) coverSim(draw, .35, .6, data);
   } else if (tool === 'gouache') {
     const flat = ts.shape === 'flat';
     const alpha = (ts.conc / 100) * .7;
@@ -2134,7 +2223,7 @@ function flushDabs(){
     use(progs.gouache, { ...sh, u_plod:0, u_col: I.abs.map(v => Math.min(4, v)), u_alpha: alpha, u_mix: mx, u_simOn: simOn, u_cur: mx > 0 && stroke && stroke.layerSnap ? backup : dummy, u_P: preSim ? preSim.tex[1] : P[si], u_D: preSim ? preSim.tex[2] : D[si] }); draw();
     if (stroke ? stroke.eraseSim : (simOwner === I.layer && simHasContent)) {
       // opaque paint hides the wet watercolour underneath it on the same layer
-      target(simFbo[si]); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+      simTouchDabs(data); target(simFbo[si]); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
       use(progs.simErase, { ...sh, u_plod: simLod(), u_aW:0, u_aP: alpha, u_aD: alpha, u_tissue:2 }); draw();
     }
   } else if (tool === 'gpen' || tool === 'calli' || tool === 'fpen') {
@@ -2148,7 +2237,7 @@ function flushDabs(){
     use(progs.pen, { u_doc:docU, u_pad:0, u_paper:paperTex, u_ink:ink, u_plod:0, u_opaque: I.white ? 1 : 0, u_rough: rough, u_nib: tool === 'calli' ? NIB : 0,
       u_op: op, u_glaze: glaze ? 1 : 0, u_base: glaze ? backup : dummy });
     draw();
-    if (I.white && stroke && stroke.eraseSim) coverSim(draw, .9, .9);
+    if (I.white && stroke && stroke.eraseSim) coverSim(draw, .9, .9, data);
   }
   gl.blendEquation(gl.FUNC_ADD); gl.disable(gl.BLEND); gl.bindVertexArray(null);
   dirty = true; return true;
@@ -2226,6 +2315,7 @@ function stepTendrils(){
   for (const gp of groups.values()) {
     const data = new Float32Array(gp.list.length * 8);
     gp.list.forEach((d, j) => { data.set([d.x, d.y, d.r, 1, Math.cos(d.t.a), Math.sin(d.t.a), 1, d.amt], j * 8); });
+    simTouchDabs(data);
     gl.bindVertexArray(dabVAO); gl.bindBuffer(gl.ARRAY_BUFFER, dabBuf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STREAM_DRAW);
     use(progs.brush, { u_doc:[doc.w, doc.h], u_pad:0, u_paper:paperTex, u_pig:gp.abs, u_gran:gp.gran * .5,
       // on a tilted sheet most of it stays in the moving water, so the threads get carried along instead of staying pinned
@@ -2263,6 +2353,7 @@ function fpenBleed(st, held){
     ink.set([x, y, rr, 1, 0, 0, 1, 1], k * 8);
     wet.set([x, y, rr * 1.2 + 3 * Math.sqrt(grow), 1, 0, 0, 1, 1], k * 8);
   }
+  simTouchDabs(wet);   // the damp halo is the wider of the two
   gl.bindVertexArray(dabVAO); gl.bindBuffer(gl.ARRAY_BUFFER, dabBuf);
   gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE);
   target(simFbo[si]);
@@ -2735,6 +2826,7 @@ function frame(now){
     emitDab({ x:stroke.last.x, y:stroke.last.y, p:stroke.pSm, tx:0, ty:0 }, true);
   }
   flushDabs();
+  pollFit();
   let ran = 0;
   for (let i = 0; i < ticks; i++) {
     if (++tickN % 2 === 0) stepTendrils();   // threads of ink grow at half the step rate
@@ -2744,6 +2836,7 @@ function frame(now){
     if (--simSteps <= 0) finalizeDry();
   }
   if (ran) {
+    if (simStepN - lastFitN >= 16) requestFit();
     if (!stroke && (stepsSinceCheck += ran) >= 90) { stepsSinceCheck = 0; if (simSteps > 0) checkDryness(); }
     dirty = true; updateWetUI();
   }
@@ -3684,6 +3777,7 @@ function applyDrawing({ m, px, simPx }){
   active = layers[clamp(m.active, 0, layers.length - 1)] || layers[0];
   if (simPx) {
     gl.bindTexture(gl.TEXTURE_2D, D[si]); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, sim.w, sim.h, gl.RGBA, gl.HALF_FLOAT, simPx);
+    simResync(false);   // settled paint only: nothing wet
     simOwner = layers[m.owner]; simHasContent = true; simSteps = 0;
   }
   syncSettings(); renderLayers(); dirty = true;
@@ -4821,7 +4915,7 @@ catch (err) { console.error(err); try { createDoc(1000, 750, .5); } catch (e2) {
 updateWetUI(true);
 buildStart(); openStart(true); checkSaved();
 window.__nijimi = { get S(){ return S; }, undo, redo, dryNow, get simSteps(){ return simSteps; }, fitView, createDoc, get view(){ return view; },
-  step(n){ for (let i = 0; i < n; i++) simStep(); }, params: () => simParams(), setTilt,
+  step(n){ for (let i = 0; i < n; i++) simStep(); }, params: () => simParams(), setTilt, get simRect(){ return simRect && simRect.slice(); },
   readSim(which, x, y, w, h){ const f = { W:fW, P:fP, D:fD }[which][si]; gl.bindFramebuffer(gl.FRAMEBUFFER, f); const px = new Float32Array(w * h * 4); gl.readPixels(x, y, w, h, gl.RGBA, gl.FLOAT, px); gl.bindFramebuffer(gl.FRAMEBUFFER, null); return Array.from(px); } };
 requestAnimationFrame(frame);
 })();
