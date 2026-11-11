@@ -1248,6 +1248,7 @@ out vec4 o;
 void main(){ vec2 uv = gl_FragCoord.xy / u_doc; vec4 d = texture(u_D, uv), p = texture(u_P, uv); float pap = textureLod(u_paper, uv, 0.).r;
   o = vec4(d.rgb * granMod(d, pap) + p.rgb, 0.); }`;
 
+// the paper and its layers as they show; made for the number of layers there are (LAYERS), so none is read for nothing
 const FS_COMP = HEAD + GRAN + `
 uniform sampler2D u_L0,u_L1,u_L2,u_L3,u_L4,u_L5,u_L6,u_L7;
 uniform float u_op[8];
@@ -1282,7 +1283,7 @@ void main(){
   vec3 col = base;
   vec3 gw = u_gouache * mix(1., shade, .45);
   #define LAYER(T, I) { vec4 l = texture(T, uv); float op = u_op[I]; vec3 A = l.rgb + (u_wetIdx == I ? wetA : vec3(0)); col = mix(col, gw, clamp(l.a, 0., 1.) * op) * exp(-A * op); }
-  LAYER(u_L0, 0) LAYER(u_L1, 1) LAYER(u_L2, 2) LAYER(u_L3, 3) LAYER(u_L4, 4) LAYER(u_L5, 5) LAYER(u_L6, 6) LAYER(u_L7, 7)
+  LAYERS
   vec2 wt = 1. / vec2(textureSize(u_W, 0));
   float wx = texture(u_W, uv + vec2(wt.x,0)).r - texture(u_W, uv - vec2(wt.x,0)).r;
   float wy = texture(u_W, uv + vec2(0,wt.y)).r - texture(u_W, uv - vec2(0,wt.y)).r;
@@ -1511,13 +1512,19 @@ let progs = {};
 try {
   const now = {
     paper: [VS_FULL, FS_PAPER], flux: [VS_FULL, FS_FLUX], update: [VS_FULL, FS_UPDATE], simPaper: [VS_FULL, FS_SIMPAPER],
-    finalize: [VS_FULL, FS_FINALIZE], bake: [VS_FULL, FS_BAKE], comp: [VS_FULL, FS_COMP],
+    finalize: [VS_FULL, FS_FINALIZE], bake: [VS_FULL, FS_BAKE], 
     brush: [VS_DAB, FS_BRUSH], simErase: [VS_DAB, FS_SIMERASE], layerErase: [VS_DAB, FS_LAYERERASE],
     pencil: [VS_DAB, FS_PENCIL], pen: [VS_DAB, FS_PEN], reduce: [VS_FULL, FS_REDUCE], wetmap: [VS_FULL, FS_WETMAP], sum: [VS_FULL, FS_SUM], gouache: [VS_DAB, FS_GOUACHE],
   };
   const started = Object.entries(now).map(([k, [vs, fs]]) => [k, programStart(vs, fs)]);
   for (const [k, st] of started) progs[k] = programDone(st);
 } catch (err) { fatal('シェーダーの準備に失敗しました: ' + err.message); console.error(err); return; }
+const compProgs = [];
+function compProg(n){
+  n = clamp(n, 1, 8);
+  return compProgs[n] || (compProgs[n] = program(VS_FULL, FS_COMP.replace('LAYERS', Array.from({ length:n }, (_, i) => `LAYER(u_L${i}, ${i})`).join(' '))));
+}
+try { compProg(2); } catch (err) { fatal('シェーダーの準備に失敗しました: ' + err.message); console.error(err); return; }
 // the ones only some actions use are made the first time they are needed
 for (const [k, vs, fs] of [['xform', VS_FULL, FS_XFORM], ['ease', VS_FULL, FS_EASE], ['merge', VS_FULL, FS_MERGE], ['resample', VS_FULL, FS_RESAMPLE]])
   Object.defineProperty(progs, k, { configurable:true, get(){ const v = program(vs, fs); Object.defineProperty(progs, k, { value:v }); return v; } });
@@ -2581,7 +2588,7 @@ function composite(){
   U.u_op = op;
   U.u_wetOp = simOwner ? layerOp(simOwner) : 1;
   U.u_gouache = GOUACHE_WHITE; U.u_wetIdx = simOwner ? layers.indexOf(simOwner) : layers.indexOf(active);
-  use(progs.comp, U); drawFull();
+  use(compProg(layers.length), U); drawFull();
 }
 
 /* ================= input ================= */
@@ -2976,9 +2983,9 @@ function frame(now){
 let wetShown = null, uiTick = 0;
 let coachQueued = false;
 function updateWetUI(force){
-  if (simSteps > 0 && !stroke && !coachQueued && !tipShown('meter')) {
-    coachQueued = true;
-    setTimeout(() => showCoach($('#dryBtn'), 'meter', '紙の濡れ具合メーター',
+  if (simSteps > 0 && !stroke && !coachQueued) {
+    coachQueued = true;   // asked once: the stored answer is not read again every frame while the paper is wet
+    if (!tipShown('meter')) setTimeout(() => showCoach($('#dryBtn'), 'meter', '紙の濡れ具合メーター',
       'ボタンの中の水の高さが、紙がどれだけ濡れているかです。<em>濃い青</em>は水が乗っている状態、<em>薄い青</em>は「半乾き」。半乾きのときに水や絵の具を置くと、にじみやバックランが出やすくなります。押すとドライヤーで一気に乾かせます。乾き具合による違いは、左下の「ノート」に見本があります。'), 500);
   }
   // states: 'wet' = water standing on the paper, 'damp' = soaked in (blooms happen here), 'dry'
@@ -3184,7 +3191,7 @@ function sampleColor(cx, cy){
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
   U.u_op = op; U.u_wetOp = simOwner ? layerOp(simOwner) : 1;
   U.u_gouache = GOUACHE_WHITE; U.u_wetIdx = simOwner ? layers.indexOf(simOwner) : layers.indexOf(active);
-  use(progs.comp, U); drawFull();
+  use(compProg(layers.length), U); drawFull();
   const px = new Uint8Array(N * N * 4); gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, px);
   target(null); freeTF(t, f); dirty = true;
   const c = [0, 0, 0];
@@ -3667,7 +3674,7 @@ $('#saveBtn').addEventListener('click', () => {
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
   U.u_op = op; U.u_wetOp = simOwner ? layerOp(simOwner) : 1;
   U.u_gouache = GOUACHE_WHITE; U.u_wetIdx = simOwner ? layers.indexOf(simOwner) : layers.indexOf(active);
-  use(progs.comp, U); drawFull();
+  use(compProg(layers.length), U); drawFull();
   const px = new Uint8Array(doc.w * doc.h * 4);
   gl.readPixels(0, 0, doc.w, doc.h, gl.RGBA, gl.UNSIGNED_BYTE, px);
   target(null); freeTF(t, f); dirty = true;
@@ -3772,7 +3779,7 @@ function thumbStart(){
     u_wetIdx: simOwner ? layers.indexOf(simOwner) : -1, u_wetOp: simOwner ? layerOp(simOwner) : 1 };
   const op = new Float32Array(8);
   for (let i = 0; i < 8; i++) { const L = layers[i]; U['u_L' + i] = L ? L.tex : dummy; op[i] = layerOp(L); }
-  U.u_op = op; use(progs.comp, U); drawFull();
+  U.u_op = op; use(compProg(layers.length), U); drawFull();
   const r = readStart(f, tw, th, 'u8'); r.tw = tw; r.th = th;
   target(null); freeTF(t, f); dirty = true;
   return r;
