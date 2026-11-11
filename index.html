@@ -2913,13 +2913,17 @@ window.addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; 
 /* ================= loop ================= */
 // the water runs on its own clock, not the screen's: SIM_HZ steps a second whether the display refreshes at 60 or 120 Hz.
 // A frame never runs more than SIM_MAX_STEPS; time it could not cover (a slow device, a tab coming back) is let go, not caught up.
+// On a device that cannot keep up, catching up would make every frame slower still: the slower the frames run on average,
+// the fewer steps one may take, so the brush keeps following the pen (the water runs slower instead).
 const SIM_HZ = 120, SIM_MAX_STEPS = 4;
-let simAcc = 0, lastFrameT = 0, tickN = 0, stepsSinceCheck = 0;
+let simAcc = 0, lastFrameT = 0, tickN = 0, stepsSinceCheck = 0, frameMs = 1000 / 60;
 function simTicks(now){
   const dt = lastFrameT ? (now - lastFrameT) / 1000 : 1 / 60; lastFrameT = now;
+  frameMs = lerp(frameMs, clamp(dt * 1000, 1, 100), .05);   // a tab coming back after a while counts as one slow frame, not as a slow device
+  const max = frameMs > 30 ? 1 : frameMs > 21 ? 2 : SIM_MAX_STEPS;
   simAcc += Math.max(0, dt) * SIM_HZ;
   let n = Math.floor(simAcc);
-  if (n > SIM_MAX_STEPS) { n = SIM_MAX_STEPS; simAcc = 0; } else simAcc -= n;
+  if (n > max) { n = max; simAcc = 0; } else simAcc -= n;
   return n;
 }
 function frame(now){
