@@ -1030,7 +1030,20 @@ uniform float u_vein;
 float thrSrc(ivec2 c){ vec4 p = paperAt(c); float t = mix(p.r, 1. - p.g, u_fiberThr); return mix(t, t * (1. - p.a), clamp(u_vein * .45, 0., .9)); }
 bool inside(ivec2 q){ return q.x>=0 && q.y>=0 && q.x<SZ.x && q.y<SZ.y; }
 `;
+// what the simulation needs from the paper, worked out once per pattern at the simulation's size instead of every step:
+// A = height, how hard it is for water to get in (thrSrc), veins, the noise for where a puddle breaks through;
+// E = the noise that roughens how paint spreads across the edge to the right (x) and the one above (y)
+const SP_NOISE = `float wdNoise(ivec2 k){ return .25 + .9 * vnoise(vec2(k) / u_res * .07 + 3.7) + .6 * vnoise(vec2(k) / u_res * .21 + 9.1); }`;
+const FS_SIMPAPER = HEAD + NOISE + SIM_COMMON + SP_NOISE + `
+uniform vec2 u_size;
+layout(location=0) out vec4 oA; layout(location=1) out vec4 oE;
+void main(){
+  SZ = ivec2(u_size); ivec2 c = ivec2(gl_FragCoord.xy); vec4 p = paperAt(c);
+  oA = vec4(p.r, thrSrc(c), p.a, vnoise(vec2(c) / u_res * .05 + 11.3));
+  oE = vec4(wdNoise(c + c + ivec2(1,0)), wdNoise(c + c + ivec2(0,1)), 0., 0.);
+}`;
 const FS_FLUX = HEAD + NOISE + SIM_COMMON + `
+uniform sampler2D u_sp;
 uniform sampler2D u_W, u_F;
 uniform float u_g, u_damp, u_slope, u_openB, u_openV, u_time, u_breach, u_film;
 uniform vec2 u_tilt;   // how much lower the paper sits one cell over in x / y (0 = lying flat)
@@ -1041,7 +1054,7 @@ void main(){
   vec4 W = texelFetch(u_W, c, 0);
   float h = W.r;
   if(h < 1e-4){ o = vec4(0); return; }
-  float hc = h + paperAt(c).r * u_slope;
+  float hc = h + texelFetch(u_sp, c, 0).r * u_slope;
   vec4 f = texelFetch(u_F, c, 0) * u_damp;
   ivec2 offs[4] = ivec2[4](ivec2(-1,0), ivec2(1,0), ivec2(0,-1), ivec2(0,1));
   vec4 nf = vec4(0);
@@ -1050,16 +1063,16 @@ void main(){
     float tl = dot(u_tilt, vec2(offs[i]));
     // water that reaches the low edge of a tilted sheet runs off the paper
     if(!inside(q)){ nf[i] = tl > 0. ? max(0., f[i] + u_g * (h * .5 + tl)) : 0.; continue; }
-    vec4 Wq = texelFetch(u_W, q, 0);
-    float hq = Wq.r + paperAt(q).r * u_slope - tl;
+    vec4 Wq = texelFetch(u_W, q, 0), Aq = texelFetch(u_sp, q, 0);
+    float hq = Wq.r + Aq.r * u_slope - tl;
     // dry paper holds a puddle back, until enough water piles up on the downhill side and breaks through as a run
     // (surface tension: it bulges out in a few broad tongues with rounded fronts, never uphill, never as hair-thin threads)
     bool open = Wq.r > 1e-4;
     if(!open){
-      bool damp = Wq.g > u_openB + u_openV * thrSrc(q);
+      bool damp = Wq.g > u_openB + u_openV * Aq.g;
       if(u_breach > 50. || tl < 0.) open = damp;   // lying flat (or uphill): as always
       // only where water has pooled deep enough (the bead at the low edge) does it spill: damp paper alone would let it creep downhill in threads
-      else if(h > u_breach * (.5 + thrSrc(q)) * (.5 + vnoise(vec2(q) / u_res * .05 + 11.3))){
+      else if(h > u_breach * (.5 + Aq.g) * (.5 + Aq.a)){
         // a straight or hollow front can move on, a narrow bulge cannot, and spreading sideways comes easier than
         // running ahead: so the water moves as one sheet with a smooth edge instead of a comb of thin runs
         int wetN = 0;
@@ -1068,7 +1081,7 @@ void main(){
       }
     }
     float jit = 1. + .8 * (vnoise(vec2(q) / u_res * .13 + vec2(u_time * .031, -u_time * .019)) - .5) + .3 * (hash12(vec2(q) * .731 + vec2(c) * .113 + u_time) - .5);
-    jit = mix(jit, jit * (.4 + 1.6 * paperAt(q).a), clamp(u_vein * .4, 0., .8));
+    jit = mix(jit, jit * (.4 + 1.6 * Aq.b), clamp(u_vein * .4, 0., .8));
     // the jitter roughens how puddles level out; the pull of a tilt stays nearly even, or it would carve the sheet into channels
     nf[i] = open ? max(0., f[i] + u_g * ((hc - hq - tl) * jit + tl * mix(1., jit, .2))) : 0.;
   }
@@ -1078,6 +1091,7 @@ void main(){
   o = nf;
 }`;
 const FS_UPDATE = HEAD + NOISE + SIM_COMMON + `
+uniform sampler2D u_sp, u_se;
 uniform sampler2D u_W, u_F, u_P, u_D;
 uniform float u_evap, u_edgeEvap, u_absorb, u_sCost, u_capK, u_delta, u_sigB, u_sigV, u_evapS;
 uniform float u_dep, u_depDry, u_desorb, u_pdiff, u_granStr, u_bloom;
@@ -1095,7 +1109,7 @@ void main(){
     for(int i=0;i<4;i++){ ivec2 q = c + nb[i]; if(!inside(q)) continue; vec4 Wq = texelFetch(u_W,q,0); if(Wq.r >= 1e-4 || (u_delta <= 0. && Wq.g > 0.)) { quiet = false; break; } }
     if(quiet){ oW = vec4(0); oP = vec4(0); oD = D; return; }
   }
-  vec4 F = texelFetch(u_F,c,0);
+  vec4 F = texelFetch(u_F,c,0), Ac = texelFetch(u_sp,c,0), Ec = texelFetch(u_se,c,0);
   float h = W.r, s = W.g;
   float outF = F.x + F.y + F.z + F.w;
   float hn = h - outF;
@@ -1103,18 +1117,20 @@ void main(){
   float stir = W.b * (1. - (h > 1e-5 ? clamp(outF / h, 0., 1.) : 0.));   // how stirred the water is: rides along with it
   ivec2 off[4] = ivec2[4](ivec2(-1,0), ivec2(1,0), ivec2(0,-1), ivec2(0,1));
   int opp[4] = int[4](1, 0, 3, 2);
-  float sigC = u_sigB + u_sigV * thrSrc(c);
+  float sigC = u_sigB + u_sigV * Ac.g;
   float inS = 0., outS = 0., dryN = 0., hNmax = 0., finT = 0.;
   for(int i=0;i<4;i++){
     ivec2 q = c + off[i];
     if(!inside(q)){ dryN += 1.; continue; }
-    vec4 Wq = texelFetch(u_W,q,0), Fq = texelFetch(u_F,q,0), Pq = texelFetch(u_P,q,0);
+    vec4 Wq = texelFetch(u_W,q,0), Fq = texelFetch(u_F,q,0), Pq = texelFetch(u_P,q,0), Aq = texelFetch(u_sp,q,0);
     float fin = Fq[opp[i]];
     hn += fin; finT += fin;
     if(fin > 0. && Wq.r > 1e-5){ Pn += Pq * clamp(fin / Wq.r, 0., 1.) * u_pdrag; stir += Wq.b * clamp(fin / Wq.r, 0., 1.); }
     if(h > 1e-4 && Wq.r > 1e-4){
-      float wd = clamp(min(h, Wq.r) / .1, 0., 1.) * (.25 + .9 * vnoise(vec2(c + q) / u_res * .07 + 3.7) + .6 * vnoise(vec2(c + q) / u_res * .21 + 9.1));
-      float vv = .5 * (paperAt(c).a + paperAt(q).a);
+      // the edge's noise is kept by the cell on its left / below
+      float en = i == 1 ? Ec.x : i == 3 ? Ec.y : i == 0 ? texelFetch(u_se, q, 0).x : texelFetch(u_se, q, 0).y;
+      float wd = clamp(min(h, Wq.r) / .1, 0., 1.) * en;
+      float vv = .5 * (Ac.b + Aq.b);
       float cond = mix(1., .12 + 2.6 * vv * vv, clamp(u_vein, 0., 1.)) * (1. + max(0., u_vein - 1.) * 1.5 * vv);
       // what evens out is how strong the paint is (amount per depth), carried through the shallower of the two: a deep pool
       // keeps its paint instead of handing it to a thin edge. Over even depth this is the plain difference of amounts.
@@ -1125,7 +1141,7 @@ void main(){
     if(Wq.r < 1e-4 && Wq.g < .5) dryN += 1.;
     hNmax = max(hNmax, Wq.r);
     float sq = Wq.g;
-    float sigQ = u_sigB + u_sigV * thrSrc(q);
+    float sigQ = u_sigB + u_sigV * Aq.g;
     if(sq > sigQ && s >= u_delta) inS += max(0., sq - s);
     if(s > sigC && sq >= u_delta) outS += max(0., s - sq);
   }
@@ -1151,7 +1167,7 @@ void main(){
       if(texture(u_W, uvb).r > .02) Pn += texture(u_P, uvb) - P;
     }
   }
-  float pap = paperAt(c).r;
+  float pap = Ac.r;
   float gm = dot(Pn.rgb, vec3(1./3.));
   float g = clamp(Pn.a / (gm + 1e-5), 0., 1.);
   float dep = u_dep * (1. + g * u_granStr * (1.8 * (1. - pap) - .3)) + u_depDry * (1. - smoothstep(0., .04, max(hn, hNmax * .5)));
@@ -1455,6 +1471,7 @@ function use(P, U){
 function mkTex(w, h, kind = 'f16'){
   const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
   if (kind === 'u8' || kind === 'u8mip') gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  else if (kind === 'rg16') gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, w, h, 0, gl.RG, gl.HALF_FLOAT, null);
   else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, kind === 'u8mip' ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -1486,7 +1503,7 @@ try {
     paper: program(VS_FULL, FS_PAPER), flux: program(VS_FULL, FS_FLUX), update: program(VS_FULL, FS_UPDATE),
     finalize: program(VS_FULL, FS_FINALIZE), bake: program(VS_FULL, FS_BAKE), comp: program(VS_FULL, FS_COMP),
     brush: program(VS_DAB, FS_BRUSH), simErase: program(VS_DAB, FS_SIMERASE), layerErase: program(VS_DAB, FS_LAYERERASE),
-    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM), ease: program(VS_FULL, FS_EASE), merge: program(VS_FULL, FS_MERGE), resample: program(VS_FULL, FS_RESAMPLE),
+    pencil: program(VS_DAB, FS_PENCIL), pen: program(VS_DAB, FS_PEN), reduce: program(VS_FULL, FS_REDUCE), wetmap: program(VS_FULL, FS_WETMAP), sum: program(VS_FULL, FS_SUM), gouache: program(VS_DAB, FS_GOUACHE), xform: program(VS_FULL, FS_XFORM), ease: program(VS_FULL, FS_EASE), simPaper: program(VS_FULL, FS_SIMPAPER), merge: program(VS_FULL, FS_MERGE), resample: program(VS_FULL, FS_RESAMPLE),
   };
 } catch (err) { fatal('シェーダーの準備に失敗しました: ' + err.message); console.error(err); return; }
 
@@ -1885,8 +1902,20 @@ function pollFit(){
 }
 function dropFit(){ if (fitRead) { gl.deleteSync(fitRead.sync); fitRead = null; fitAcc = null; } }
 function clearSim(){ for (let i = 0; i < 2; i++) { clearF(simFbo[i]); clearF(fF[i]); } simHasContent = false; simSteps = 0; simBoost = 1; tips.length = 0; simRect = [0, 0, 0, 0]; dropFit(); }
+// the paper as the simulation reads it (see FS_SIMPAPER): made again when the pattern, the veins setting or the size change
+let simPaper = null;
+function simPaperTex(p){
+  const key = paperGen + '|' + p.vein + '|' + p.fiberThr + '|' + sim.w + 'x' + sim.h;
+  if (simPaper && simPaper.key === key) return simPaper;
+  if (simPaper && (simPaper.w !== sim.w || simPaper.h !== sim.h)) { freeTF(simPaper.a, null); freeTF(simPaper.e, simPaper.f); simPaper = null; }
+  if (!simPaper) { const a = mkTex(sim.w, sim.h), e = mkTex(sim.w, sim.h, 'rg16'); simPaper = { a, e, f: mkFbo([a, e]), w: sim.w, h: sim.h }; }
+  const sc = gl.isEnabled(gl.SCISSOR_TEST); gl.disable(gl.SCISSOR_TEST); gl.disable(gl.BLEND); target(simPaper.f);
+  use(progs.simPaper, { u_paper:paperTex, u_plod: simLod(), u_res: simQ, u_vein:p.vein, u_fiberThr:p.fiberThr, u_size:[sim.w, sim.h] }); drawFull();
+  if (sc) gl.enable(gl.SCISSOR_TEST);
+  simPaper.key = key; return simPaper;
+}
 function simStep(){
-  const p = simParams(); simTime = (simTime + .618) % 97; swirlClock = (swirlClock + 1) % 1e5;
+  const p = simParams(); const sp = simPaperTex(p); simTime = (simTime + .618) % 97; swirlClock = (swirlClock + 1) % 1e5;
   if (simRect) {
     if (rectEmpty(simRect)) return;   // nothing anywhere that could change
     simStepN++;
@@ -1895,10 +1924,10 @@ function simStep(){
   }
   gl.disable(gl.BLEND);
   target(fF[1 - fi]);
-  use(progs.flux, { u_W:W[si], u_F:F[fi], u_paper:paperTex, u_plod: simLod(), u_res: simQ, u_vein:p.vein, u_g:p.g, u_damp:p.damp, u_slope:p.slope, u_openB:p.openB, u_openV:p.openV, u_fiberThr:p.fiberThr, u_time:simTime, u_tilt:p.tilt, u_breach:p.breach, u_film:p.film });
+  use(progs.flux, { u_W:W[si], u_F:F[fi], u_sp:sp.a, u_paper:paperTex, u_plod: simLod(), u_res: simQ, u_vein:p.vein, u_g:p.g, u_damp:p.damp, u_slope:p.slope, u_openB:p.openB, u_openV:p.openV, u_fiberThr:p.fiberThr, u_time:simTime, u_tilt:p.tilt, u_breach:p.breach, u_film:p.film });
   drawFull(); fi = 1 - fi;
   target(simFbo[1 - si]);
-  use(progs.update, { u_W:W[si], u_F:F[fi], u_P:P[si], u_D:D[si], u_paper:paperTex, u_plod: simLod(), u_res: simQ, u_vein:p.vein, u_fiberThr:p.fiberThr,
+  use(progs.update, { u_W:W[si], u_F:F[fi], u_P:P[si], u_D:D[si], u_sp:sp.a, u_se:sp.e, u_paper:paperTex, u_plod: simLod(), u_res: simQ, u_vein:p.vein, u_fiberThr:p.fiberThr,
     u_evap:p.evap, u_edgeEvap:p.edgeEvap, u_absorb:p.absorb, u_sCost:p.sCost, u_capK:p.capK, u_delta:p.delta, u_sigB:p.sigB, u_sigV:p.sigV, u_evapS:p.evapS,
     u_dep:p.dep, u_depDry:p.depDry, u_desorb:p.desorb, u_pdiff:p.pdiff, u_granStr:p.granStr, u_bloom:p.bloom,
     u_pdrag:p.pdrag, u_swirl:p.swirl, u_thinSlow:p.thinSlow, u_time:swirlClock });
